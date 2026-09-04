@@ -17,23 +17,21 @@ export function usePVP(onStateUpdate) {
   function subscribeToRoom(id, role) {
     if (channelRef.current) channelRef.current.unsubscribe();
 
-    channelRef.current = supabase
-      .channel("room-" + id)
-      .on("postgres_changes", {
-        event: "UPDATE",
-        schema: "public",
-        table: "rooms",
-        filter: `id=eq.${id}`,
-      }, payload => {
-        const row = payload.new;
-        // 相手が入室した
-        if (role === "host" && row.status === "ready" && pvpStatus === "waiting") {
-          setPvpStatus("playing");
-        }
-        // ゲーム状態の更新
-        if (row.state) onStateUpdate(row.state, row.status);
-      })
-      .subscribe();
+channelRef.current = supabase
+  .channel("room-" + id)
+  .on("postgres_changes", {
+    event: "UPDATE",
+    schema: "public",
+    table: "rooms",
+    filter: `id=eq.${id}`,
+  }, payload => {
+    const row = payload.new;
+    if (row.status === "ready" || row.status === "playing") {
+      setPvpStatus("playing");  // ← ここを確実に呼ぶ
+    }
+    if (row.state) onStateUpdate(row.state, row.status);
+  })
+  .subscribe();
   }
 
   // 部屋を作る（ホスト）
