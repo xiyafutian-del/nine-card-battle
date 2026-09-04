@@ -2,6 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { INITIAL_CARDS } from './constants/cards.js';
 import { useBattle } from './hooks/useBattle.js';
 import { usePVP } from './hooks/usePVP.js';
+// PVP: 相手が入室したらゲーム開始
+useEffect(() => {
+  if (pvpStatus === "playing" && battle?.mode === "pvp" && screen !== "battle") {
+    setScreen("battle");
+  }
+}, [pvpStatus]);
 import { LobbyScreen } from './screens/LobbyScreen.jsx';
 import { BattleScreen } from './screens/BattleScreen.jsx';
 import { DeckScreen } from './screens/DeckScreen.jsx';
