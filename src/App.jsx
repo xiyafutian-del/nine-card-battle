@@ -2,18 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { INITIAL_CARDS } from './constants/cards.js';
 import { useBattle } from './hooks/useBattle.js';
 import { usePVP } from './hooks/usePVP.js';
-// PVP: 相手が入室したらゲーム開始
-useEffect(() => {
-  if (pvpStatus === "playing" && battle?.mode === "pvp" && screen !== "battle") {
-    setScreen("battle");
-  }
-}, [pvpStatus]);
 import { LobbyScreen } from './screens/LobbyScreen.jsx';
 import { BattleScreen } from './screens/BattleScreen.jsx';
 import { DeckScreen } from './screens/DeckScreen.jsx';
 import { DexScreen } from './screens/DexScreen.jsx';
 import { makeUnitFromCard } from './engine/effects.js';
-import { buildDeck, checkVictory } from './engine/battle.js';
+import { buildDeck } from './engine/battle.js';
 import { CORE_CARD } from './constants/cards.js';
 import { getGeneratorCost } from './constants/index.js';
 
@@ -61,14 +55,10 @@ export default function App() {
     setConfirmLeave, setBattle,
   } = useBattle(cardPool, deckCounts, playerGenerator);
 
-  // PVP状態を受信したときの処理
   function handlePVPStateUpdate(newState, status) {
-    if (status === "playing" || status === "started") {
-      setBattle(prev => {
-        // 自分のターンの時は無視（自分が操作中）
-        if (prev && prev.active === pvpRole ? "blue" : "red") return prev;
-        return newState;
-      });
+    if (status === "ready" || status === "playing") {
+      setBattle(newState);
+      setScreen("battle");
     }
   }
 
@@ -78,13 +68,19 @@ export default function App() {
     createRoom, joinRoom, pushState, leaveRoom,
   } = usePVP(handlePVPStateUpdate);
 
+  // ホスト側: pvpStatusがplayingになったらバトル画面へ
+  useEffect(() => {
+    if (pvpStatus === "playing" && screen !== "battle") {
+      setScreen("battle");
+    }
+  }, [pvpStatus]);
+
   // PVP: ターン終了時に状態を送信
   const prevActive = useRef(null);
   useEffect(() => {
     if (!battle || battle.mode !== "pvp") return;
     if (prevActive.current !== battle.active) {
       prevActive.current = battle.active;
-      // 自分のターンが終わったら送信
       const myColor = pvpRole === "host" ? "blue" : "red";
       if (battle.active !== myColor) {
         pushState(battle);
@@ -101,14 +97,9 @@ export default function App() {
   async function handleJoinRoom(id) {
     const state = await joinRoom(id);
     if (state) {
-      // ゲストは後攻（red）
-      const guestState = { ...state, firstPlayer: "blue" };
-      setBattle(guestState);
+      setBattle({ ...state, firstPlayer: "blue" });
+      setScreen("battle");
     }
-  }
-
-  function handleStartPVP() {
-    setScreen("battle");
   }
 
   function handleRequestBack() {
@@ -123,7 +114,6 @@ export default function App() {
     setScreen("lobby");
   }
 
-  // デッキ操作
   function incCount(id) {
     setDeckCounts(p => deckTotal < 30 ? { ...p, [id]: (p[id] || 0) + 1 } : p);
   }
@@ -146,22 +136,8 @@ export default function App() {
     setCardPool(p => p.map(c => c.id === cardId ? { ...c, image: dataUrl } : c));
   }
 
-  // PVP: 相手のターン中は操作を無効化
   const myColor = pvpRole === "host" ? "blue" : "red";
   const isPVPMyTurn = !battle || battle.mode !== "pvp" || battle.active === myColor;
-
-  function handleCellClickPVP(row, col, extra) {
-    if (!isPVPMyTurn) return;
-    handleCellClick(row, col, extra);
-  }
-  function handleSummonPVP(handIndex, row, col) {
-    if (!isPVPMyTurn) return;
-    handleSummon(handIndex, row, col);
-  }
-  function handleEndTurnPVP() {
-    if (!isPVPMyTurn) return;
-    endTurn();
-  }
 
   if (screen === "battle" && battle) {
     return (
@@ -169,9 +145,15 @@ export default function App() {
         battle={battle} confirmLeave={confirmLeave}
         onRequestBack={handleRequestBack}
         onLeaveToLobby={handleLeaveToLobby}
-        onEndTurn={battle.mode === "pvp" ? handleEndTurnPVP : endTurn}
-        onCellClick={battle.mode === "pvp" ? handleCellClickPVP : handleCellClick}
-        onSummon={battle.mode === "pvp" ? handleSummonPVP : handleSummon}
+        onEndTurn={battle.mode === "pvp"
+          ? () => { if (isPVPMyTurn) endTurn(); }
+          : endTurn}
+        onCellClick={battle.mode === "pvp"
+          ? (row, col, extra) => { if (isPVPMyTurn) handleCellClick(row, col, extra); }
+          : handleCellClick}
+        onSummon={battle.mode === "pvp"
+          ? (hi, row, col) => { if (isPVPMyTurn) handleSummon(hi, row, col); }
+          : handleSummon}
         onSetConfirmLeave={setConfirmLeave}
         cardImages={cardImages}
         pvpRole={pvpRole}
@@ -207,7 +189,6 @@ export default function App() {
       onNav={setScreen}
       onCreateRoom={handleCreateRoom}
       onJoinRoom={handleJoinRoom}
-      onStartPVP={handleStartPVP}
       pvpStatus={pvpStatus}
       pvpRole={pvpRole}
       roomId={roomId}
