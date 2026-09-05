@@ -94,13 +94,14 @@ function handlePVPStateUpdate(newState, status) {
     if (id) setBattle(initialState);
   }
 
-  async function handleJoinRoom(id) {
-    const state = await joinRoom(id);
-    if (state) {
-      setBattle({ ...state, firstPlayer: "blue" });
-      setScreen("battle");
-    }
+async function handleJoinRoom(id) {
+  const state = await joinRoom(id);
+  if (state) {
+    // ゲストはred側でプレイ
+    setBattle({ ...state, firstPlayer: "blue" });
+    setScreen("battle");
   }
+}
 
   function handleRequestBack() {
     if (battle?.mode === "pvp") leaveRoom();
