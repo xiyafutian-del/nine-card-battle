@@ -8,33 +8,39 @@ function generateRoomId() {
 export function usePVP(onStateUpdate) {
   const [roomId, setRoomId] = useState("");
   const [inputRoomId, setInputRoomId] = useState("");
-  const [pvpRole, setPvpRole] = useState(null); // "host" | "guest"
-  const [pvpStatus, setPvpStatus] = useState("idle"); // "idle"|"waiting"|"ready"|"playing"
+  const [pvpRole, setPvpRole] = useState(null);
+  const [pvpStatus, setPvpStatus] = useState("idle");
   const [error, setError] = useState("");
   const channelRef = useRef(null);
+  const roleRef = useRef(null); // クロージャ問題を避けるためrefで管理
 
-  // リアルタイム購読
   function subscribeToRoom(id, role) {
     if (channelRef.current) channelRef.current.unsubscribe();
 
-channelRef.current = supabase
-  .channel("room-" + id)
-  .on("postgres_changes", {
-    event: "UPDATE",
-    schema: "public",
-    table: "rooms",
-    filter: `id=eq.${id}`,
-  }, payload => {
-    const row = payload.new;
-    if (row.status === "ready" || row.status === "playing") {
-      setPvpStatus("playing");  // ← ここを確実に呼ぶ
-    }
-    if (row.state) onStateUpdate(row.state, row.status);
-  })
-  .subscribe();
+    channelRef.current = supabase
+      .channel("room-" + id)
+      .on("postgres_changes", {
+        event: "UPDATE",
+        schema: "public",
+        table: "rooms",
+        filter: `id=eq.${id}`,
+      }, payload => {
+        const row = payload.new;
+        const currentRole = roleRef.current;
+
+        // ホスト側: ゲストが入室したら ready になる
+        if (currentRole === "host" && row.status === "ready") {
+          setPvpStatus("playing");
+        }
+
+        // ゲーム状態の更新（相手の操作を反映）
+        if (row.state && row.updated_by !== currentRole) {
+          onStateUpdate(row.state, row.status);
+        }
+      })
+      .subscribe();
   }
 
-  // 部屋を作る（ホスト）
   async function createRoom(initialState) {
     setError("");
     const id = generateRoomId();
@@ -43,16 +49,17 @@ channelRef.current = supabase
       state: initialState,
       host_id: "host",
       status: "waiting",
+      updated_by: "host",
     });
     if (err) { setError("部屋の作成に失敗しました"); return null; }
     setRoomId(id);
     setPvpRole("host");
+    roleRef.current = "host";
     setPvpStatus("waiting");
     subscribeToRoom(id, "host");
     return id;
   }
 
-  // 部屋に入る（ゲスト）
   async function joinRoom(id) {
     setError("");
     const { data, error: err } = await supabase
@@ -61,26 +68,34 @@ channelRef.current = supabase
     if (data.status !== "waiting") { setError("この部屋はすでに満員です"); return null; }
 
     const { error: err2 } = await supabase
-      .from("rooms").update({ guest_id: "guest", status: "ready" }).eq("id", id.toUpperCase());
+      .from("rooms").update({
+        guest_id: "guest",
+        status: "ready",
+        updated_by: "guest",
+      }).eq("id", id.toUpperCase());
     if (err2) { setError("入室に失敗しました"); return null; }
 
     setRoomId(id.toUpperCase());
     setPvpRole("guest");
+    roleRef.current = "guest";
     setPvpStatus("playing");
     subscribeToRoom(id.toUpperCase(), "guest");
     return data.state;
   }
 
-  // ゲーム状態を送信
-  async function pushState(state) {
+  async function pushState(state, role) {
     if (!roomId) return;
-    await supabase.from("rooms").update({ state, updated_at: new Date().toISOString() }).eq("id", roomId);
+    await supabase.from("rooms").update({
+      state,
+      updated_by: role || roleRef.current,
+      updated_at: new Date().toISOString(),
+    }).eq("id", roomId);
   }
 
-  // 退室
   function leaveRoom() {
     if (channelRef.current) channelRef.current.unsubscribe();
-    setRoomId(""); setPvpRole(null); setPvpStatus("idle"); setError("");
+    setRoomId(""); setPvpRole(null); roleRef.current = null;
+    setPvpStatus("idle"); setError("");
   }
 
   useEffect(() => {
