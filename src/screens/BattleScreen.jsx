@@ -171,6 +171,11 @@ export function BattleScreen({
           <span className="text-gray-400 text-xs ml-auto">手{handArr.length}</span>
         </div>
 
+        <Board
+  ...
+  flipped={pvpRole === "guest"}
+/>
+
         {/* 手札 */}
         <HandFan
           hand={handArr} handCost={handCost}
