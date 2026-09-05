@@ -171,11 +171,18 @@ export function BattleScreen({
           <span className="text-gray-400 text-xs ml-auto">手{handArr.length}</span>
         </div>
 
-        <Board
-  ...
+<Board
+  board={board} active={active} selectedUnit={selectedUnit}
+  selectedSpell={selectedSpell} gameOver={isGameOver ? gameOver : null}
+  mode={mode} turn={turn} firstPlayer={firstPlayer}
+  draggingCard={draggingCard} dropPreview={dropPreview}
+  playerGrave={battle.playerGrave} aiGrave={battle.aiGrave}
+  playerDeck={battle.playerDeck.length} aiDeck={battle.aiDeck.length}
+  onCellClick={onCellClick}
+  onDragOver={handleDragOver} onDrop={handleDrop} onDragLeave={handleDragLeave}
   flipped={pvpRole === "guest"}
 />
-
+        
         {/* 手札 */}
         <HandFan
           hand={handArr} handCost={handCost}
