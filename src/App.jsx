@@ -55,12 +55,12 @@ export default function App() {
     setConfirmLeave, setBattle,
   } = useBattle(cardPool, deckCounts, playerGenerator);
 
-  function handlePVPStateUpdate(newState, status) {
-    if (status === "ready" || status === "playing") {
-      setBattle(newState);
-      setScreen("battle");
-    }
+function handlePVPStateUpdate(newState, status) {
+  if (newState) {
+    setBattle(newState);
+    if (screen !== "battle") setScreen("battle");
   }
+}
 
   const {
     roomId, inputRoomId, setInputRoomId,
