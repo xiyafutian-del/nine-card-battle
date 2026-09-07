@@ -1,146 +1,227 @@
-import { UnitCell } from './CardParts.jsx';
-import { rowToCoord, getAttackTargets, getMovable } from '../engine/battle.js';
+import { useRef, useState } from 'react';
+import { Zap } from 'lucide-react';
+import { Board } from '../components/Board.jsx';
+import { HandFan } from '../components/HandFan.jsx';
+import { rowToCoord } from '../engine/battle.js';
+import { GENERATOR_INFO } from '../constants/index.js';
 
-export function Board({
-  board, active, selectedUnit, selectedSpell, gameOver,
-  mode, turn, firstPlayer,
-  draggingCard, onCellClick, onDragOver, onDrop, onDragLeave,
-  dropPreview, playerGrave, aiGrave, playerDeck, aiDeck,
-  flipped = false,
+export function BattleScreen({
+  battle, confirmLeave,
+  onRequestBack, onLeaveToLobby, onEndTurn,
+  onCellClick, onSummon, onSetConfirmLeave,
+  cardImages, pvpRole,
 }) {
+  const { board, active, mode, gameOver, turn, firstPlayer, selectedUnit, selectedSpell } = battle;
   const enem = active === "blue" ? "red" : "blue";
+  const handArr = mode === "solo"
+    ? (active === "blue" ? battle.playerHand : battle.aiHand)
+    : battle.playerHand;
+  const handCost = active === "blue" ? battle.playerCost : battle.aiCost;
+  const handDisabled = (mode === "pve" && active === "red") ||
+                       (mode === "pvp" && pvpRole === "guest" && active === "blue") ||
+                       (mode === "pvp" && pvpRole === "host" && active === "red");
   const turn1block = turn === 1 && active === firstPlayer;
+  const isGameOver = gameOver !== null && gameOver !== undefined;
+  const gen = active === "blue" ? battle.playerGenerator : battle.aiGenerator;
+  const genInfo = GENERATOR_INFO[gen] || GENERATOR_INFO.water;
 
-  const attackSet = new Set();
-  const moveSet = new Set();
-  const selSet = new Set();
-  const growthSet = new Set();
+  const [draggingCard, setDraggingCard] = useState(null);
+  const [dropPreview, setDropPreview] = useState(null);
+  const dragRef = useRef(null);
 
-  if (selectedUnit && !turn1block) {
-    const su = selectedUnit;
-    const att = board[active][su.col]?.[su.idx];
-    selSet.add(`${active}-${su.col}-${su.idx}`);
-    if (att) {
-      getAttackTargets(active, su.col, su.idx, att, board)
-        .forEach(t => attackSet.add(`${enem}-${t.col}-${t.idx}`));
-      getMovable(active, su.col, su.idx, board)
-        .forEach(m => moveSet.add(`${active}-${m.col}-${m.idx}`));
+  function handleDragStart(e, index, card) {
+    setDraggingCard({ index, card });
+    dragRef.current = { index, card };
+    e.dataTransfer.effectAllowed = "move";
+  }
+  function handleDragEnd() {
+    setDraggingCard(null);
+    setDropPreview(null);
+    dragRef.current = null;
+  }
+  function handleDragOver(e, row, col) {
+    e.preventDefault();
+    if (!dragRef.current) return;
+    const { side, idx } = rowToCoord(row);
+    if (side !== active) { setDropPreview(null); return; }
+    const cost = active === "blue" ? battle.playerCost : battle.aiCost;
+    if (cost < dragRef.current.card.cost) { setDropPreview(null); return; }
+    if (battle.board[active][col].length >= 3) { setDropPreview(null); return; }
+    setDropPreview({ col, insertIdx: idx });
+  }
+  function handleDragLeave(e) {
+    if (e.currentTarget.contains(e.relatedTarget)) return;
+    setDropPreview(null);
+  }
+  function handleDrop(e, row, col) {
+    e.preventDefault();
+    setDropPreview(null);
+    const dc = dragRef.current;
+    if (!dc) return;
+    onSummon(dc.index, row, col);
+    setDraggingCard(null);
+    dragRef.current = null;
+  }
+
+  function handleSpellActivate(handIndex) {
+    const card = handArr[handIndex];
+    if (!card) return;
+    if (!card.targetType || card.targetType === "none") {
+      onSummon(handIndex, -1, -1);
+    } else {
+      onCellClick(-1, -1, { spell: true, handIndex, card });
     }
   }
 
-  if (!turn1block && !gameOver && !(mode === "pve" && active === "red")) {
-    for (let c = 0; c < 3; c++) {
-      for (let i = 0; i < board[active][c].length; i++) {
-        const u = board[active][c][i];
-        if (u?.effect?.action === "growth" && !u.acted && u.summonedTurn !== turn)
-          growthSet.add(`${active}-${c}-${i}`);
-      }
+  let resultText = null;
+  if (isGameOver) {
+    if (gameOver === "draw") resultText = "🤝 引き分け";
+    else if (mode === "pve") resultText = gameOver === "blue" ? "🎉 勝利！" : "💀 敗北…";
+    else if (mode === "pvp") {
+      const myColor = pvpRole === "host" ? "blue" : "red";
+      resultText = gameOver === myColor ? "🎉 勝利！" : "💀 敗北…";
     }
+    else resultText = gameOver === "blue" ? "🔵側の勝利！" : "🔴側の勝利！";
   }
 
-  const dropableSet = new Set();
-  if (draggingCard) {
-    for (let c = 0; c < 3; c++) {
-      if (board[active][c].length < 3) {
-        const base = active === "blue" ? 3 : 0;
-        for (let r = 0; r < 3; r++) dropableSet.add(`${base + r}-${c}`);
-      }
-    }
-  }
+  // PVP時の表示: 自分は常に下側
+  const myColor = pvpRole === "host" ? "blue" : pvpRole === "guest" ? "red" : "blue";
+  const myHand = mode === "pvp"
+    ? (myColor === "blue" ? battle.playerHand : battle.aiHand)
+    : handArr;
+  const myCost = mode === "pvp"
+    ? (myColor === "blue" ? battle.playerCost : battle.aiCost)
+    : handCost;
 
-  const pushedUnits = new Set();
-  if (dropPreview) {
-    board[active][dropPreview.col]?.forEach((u, i) => {
-      if (i >= dropPreview.insertIdx && u) pushedUnits.add(u.uid);
-    });
-  }
-
-  // flipped=true のとき行を逆順（ゲスト視点: red が手前）
-  const rowOrder = flipped ? [5,4,3,2,1,0] : [0,1,2,3,4,5];
+  let guideText = "";
+  if (isGameOver) guideText = "";
+  else if (handDisabled) guideText = "相手のターン…";
+  else if (selectedSpell) guideText = selectedSpell.card.name + ": 対象を盤面からタップ";
+  else if (draggingCard) guideText = dropPreview ? "割り込み召喚" : "マスへドロップ";
+  else if (selectedUnit) guideText = turn1block ? "先行1T目は行動不可" : "橙=攻撃 / 緑=移動 / 他タップでキャンセル";
+  else if (turn1block) guideText = "先行1T目は攻撃・移動不可";
+  else guideText = "スワイプ/ドラッグで召喚 / スペルはタップ / ユニットタップで行動";
 
   return (
-    <div className="flex gap-1 mx-auto flex-shrink-0" style={{width:"fit-content"}}>
-      <div
-        className="relative flex-shrink-0 bg-white border border-black"
-        style={{touchAction:"none"}}
-        onDragLeave={onDragLeave}
-      >
-        {/* 格子線SVG */}
-        <svg className="absolute inset-0 pointer-events-none" style={{width:"179px",height:"518px",zIndex:0}} viewBox="0 0 179 518">
-          <line x1="59"  y1="0" x2="59"  y2="518" stroke="black" strokeWidth="1"/>
-          <line x1="119" y1="0" x2="119" y2="518" stroke="black" strokeWidth="1"/>
-          {[86,172,258,344,430].map(y => (
-            <line key={y} x1="0" y1={y} x2="179" y2={y} stroke="black" strokeWidth={y===258?"2":"1"}/>
-          ))}
-        </svg>
-        {/* セル */}
-        <div className="relative grid" style={{gridTemplateColumns:"repeat(3,59px)",gridTemplateRows:"repeat(6,86px)",width:"179px",height:"518px"}}>
-          {rowOrder.flatMap((row) =>
-            Array.from({length:3}).map((__, col) => {
-              const {side, idx} = rowToCoord(row);
-              const cellKey = `${row}-${col}`;
-              const unitKey = `${side}-${col}-${idx}`;
-              const unit = board[side][col][idx];
-              const isSel    = selSet.has(unitKey);
-              const isAtk    = attackSet.has(unitKey);
-              const isMov    = moveSet.has(unitKey);
-              const isDrop   = dropableSet.has(cellKey);
-              const isGrowth = growthSet.has(unitKey);
-              const isInsert = dropPreview && side === active && col === dropPreview.col && idx === dropPreview.insertIdx;
-              const isPushed = unit && pushedUnits.has(unit.uid);
+    <div className="h-screen bg-white text-black px-2 py-2 flex flex-col select-none overflow-hidden">
+      <div className="max-w-sm w-full mx-auto flex-1 flex flex-col relative min-h-0">
 
-              let bgColor = "transparent";
-              if (isSel)         bgColor = "rgba(0,0,0,0.08)";
-              else if (isAtk)    bgColor = "rgba(255,100,0,0.15)";
-              else if (isMov)    bgColor = "rgba(0,180,0,0.12)";
-              else if (isDrop)   bgColor = "rgba(100,0,200,0.08)";
-              else if (isGrowth) bgColor = "rgba(0,160,0,0.08)";
+        {/* 離脱確認モーダル */}
+        {confirmLeave && (
+          <div className="absolute inset-0 z-50 bg-black/50 flex items-center justify-center">
+            <div className="bg-white border border-black p-4 w-64 text-center">
+              <div className="text-sm font-bold mb-3">対戦を中断してロビーへ戻りますか？</div>
+              <div className="flex gap-2">
+                <button onClick={onLeaveToLobby} className="flex-1 bg-black text-white font-bold py-2 text-sm">戻る</button>
+                <button onClick={() => onSetConfirmLeave(false)} className="flex-1 bg-white border border-black font-bold py-2 text-sm">続ける</button>
+              </div>
+            </div>
+          </div>
+        )}
 
-              const canTap = !gameOver && !(mode==="pve"&&active==="red") && side===active && unit && !unit.acted && !turn1block;
+        {/* ヘッダー */}
+        <div className="flex items-center justify-between mb-1 px-1 flex-shrink-0">
+          <button onClick={onRequestBack} className="text-black text-xs border border-black px-2 py-1">← ロビー</button>
+          <div className="text-xs font-bold">TURN {turn}/25</div>
+          <div className="text-xs font-bold">
+            {mode === "pvp"
+              ? <span>{active === myColor ? "あなたの番" : "相手の番"}</span>
+              : mode === "solo"
+              ? <span>{active === "blue" ? "🔵の番" : "🔴の番"}</span>
+              : <span>{active === "blue" ? "あなたの番" : "相手の番"}</span>
+            }
+          </div>
+        </div>
 
-              return (
-                <div
-                  key={cellKey}
-                  style={{width:"59px",height:"86px",backgroundColor:bgColor,position:"relative",zIndex:1}}
-                  className={canTap || isAtk || isMov ? "cursor-pointer" : ""}
-                  onClick={() => { if(!gameOver) onCellClick(row, col); }}
-                  onDragOver={e => onDragOver(e, row, col)}
-                  onDrop={e => onDrop(e, row, col)}
-                >
-                  {isInsert && (
-                    <div className="absolute top-0 left-0 right-0 flex justify-center z-20 pointer-events-none">
-                      <div className="text-black text-xs font-bold">▼</div>
-                    </div>
-                  )}
-                  {unit && <UnitCell unit={unit} pushed={isPushed}/>}
-                </div>
-              );
-            })
+        {/* 相手情報 */}
+        <div className="flex items-center justify-between text-xs mb-1 px-1 flex-shrink-0">
+          <span className="font-bold">相手</span>
+          <span className="flex items-center gap-1 font-mono">
+            <Zap size={11}/>
+            {mode === "pvp"
+              ? (myColor === "blue" ? battle.aiCost : battle.playerCost)
+              : battle.aiCost
+            }
+          </span>
+          <span className="text-gray-500">
+            手{mode === "pvp"
+              ? (myColor === "blue" ? battle.aiHand.length : battle.playerHand.length)
+              : battle.aiHand.length
+            }
+          </span>
+        </div>
+
+        {/* 盤面 */}
+        <div id="battle-board">
+          <Board
+            board={board} active={active} selectedUnit={selectedUnit}
+            selectedSpell={selectedSpell} gameOver={isGameOver ? gameOver : null}
+            mode={mode} turn={turn} firstPlayer={firstPlayer}
+            draggingCard={draggingCard} dropPreview={dropPreview}
+            playerGrave={battle.playerGrave} aiGrave={battle.aiGrave}
+            playerDeck={battle.playerDeck.length} aiDeck={battle.aiDeck.length}
+            onCellClick={onCellClick}
+            onDragOver={handleDragOver} onDrop={handleDrop} onDragLeave={handleDragLeave}
+            flipped={pvpRole === "guest"}
+          />
+        </div>
+
+        <div className="flex justify-between text-xs text-gray-400 px-1 mt-0.5 flex-shrink-0">
+          <span>後</span><span className="text-black font-bold">── 前線 ──</span><span>後</span>
+        </div>
+
+        {/* ガイド + ターン終了 */}
+        <div className="flex items-center gap-2 px-1 my-1 flex-shrink-0 min-h-8">
+          {isGameOver ? (
+            <div className="flex-1 text-center">
+              <div className="text-black font-bold text-lg">{resultText}</div>
+              <button onClick={onLeaveToLobby} className="mt-1 bg-white border border-black text-black font-bold px-6 py-1 text-sm">ロビーへ戻る</button>
+            </div>
+          ) : (
+            <>
+              <div className="flex-1 text-xs text-gray-600 text-center">{guideText}</div>
+              <button
+                onClick={onEndTurn}
+                disabled={handDisabled}
+                className="bg-white border border-black font-bold px-3 py-1 text-xs disabled:opacity-40 flex-shrink-0"
+              >
+                ターン終了
+              </button>
+            </>
           )}
         </div>
-      </div>
 
-      {/* サイドパネル */}
-      <div className="flex flex-col justify-between flex-shrink-0" style={{width:"36px"}}>
-        <div className="flex flex-col gap-1">
-          <SideBox label="デッキ" count={flipped ? playerDeck : aiDeck}/>
-          <SideBox label="墓地"   count={flipped ? (playerGrave||[]).length : (aiGrave||[]).length}/>
+        {/* 自分情報 */}
+        <div className="flex items-center gap-2 px-1 flex-shrink-0 mb-1">
+          <span className="font-bold text-xs">あなた</span>
+          <span className="flex items-center gap-1 font-mono text-xs">
+            <Zap size={10}/>{myCost}
+            <span className="text-gray-400 font-normal" style={{fontSize:"0.6rem"}}>({genInfo.name})</span>
+          </span>
+          <span className="text-gray-400 text-xs ml-auto">手{myHand.length}</span>
         </div>
-        <div className="text-center text-gray-400" style={{fontSize:"0.5rem"}}>前<br/>線</div>
-        <div className="flex flex-col gap-1">
-          <SideBox label="墓地"   count={flipped ? (aiGrave||[]).length : (playerGrave||[]).length}/>
-          <SideBox label="デッキ" count={flipped ? aiDeck : playerDeck}/>
+
+        {/* 手札 */}
+        <HandFan
+          hand={myHand}
+          handCost={myCost}
+          handDisabled={handDisabled}
+          isGameOver={isGameOver}
+          cardImages={cardImages}
+          onSummon={onSummon}
+          onSpellActivate={handleSpellActivate}
+          draggingCard={draggingCard}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        />
+
+        {/* ログ */}
+        <div className="mt-1 bg-gray-50 border border-black p-1.5 text-xs text-gray-700 overflow-y-auto flex-shrink-0" style={{maxHeight:"2.6rem"}}>
+          {[...battle.log].reverse().slice(0, 4).map((l, i) => (
+            <div key={i} className={i === 0 ? "text-black font-bold" : "text-gray-500"}>・{l}</div>
+          ))}
         </div>
       </div>
-    </div>
-  );
-}
-
-function SideBox({ label, count }) {
-  return (
-    <div className="border border-black text-center" style={{width:"36px",height:"52px",fontSize:"0.5rem"}}>
-      <div className="font-bold border-b border-black">{label}</div>
-      <div className="text-lg font-bold leading-tight">{count}</div>
     </div>
   );
 }
