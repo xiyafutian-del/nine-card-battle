@@ -1,66 +1,181 @@
+import { useState, useEffect } from 'react';
 import { Zap } from 'lucide-react';
-import { ATTR_LABELS, GENERATOR_INFO, TYPES } from '../constants/index.js';
-import { TypeBadge, AttrBadge, rangeText } from '../components/CardParts.jsx';
+import { ATTRS, ATTR_LABELS, GENERATOR_INFO, TYPES, RANGE_TYPE } from '../constants/index.js';
+import { CardGrid } from '../components/CardParts.jsx';
 
-function StatRow({ card }) {
-  const isSpellMagic = card.type === TYPES.SPELL || card.type === TYPES.MAGIC;
-  return (
-    <div className="flex items-center text-xs text-black gap-2 mt-0.5 flex-wrap">
-      {!isSpellMagic && card.hp  > 0 && <span>HP:{card.hp}</span>}
-      {!isSpellMagic && card.atk > 0 && <span>ATK:{card.atk}</span>}
-      {!isSpellMagic && <span>{rangeText(card)}</span>}
-      {card.desc && <span className="text-gray-500">{card.desc}</span>}
-    </div>
-  );
+const EMPTY_DECK = { name: "", counts: {}, generator: "water" };
+
+function rangeText(card) {
+  if (card.rangeType === "diamond") return `◇${card.dRange || 1}`;
+  return `□${card.hRange || 1}×${card.vRange || 1}`;
 }
 
 export function DeckScreen({
-  cardPool, deckCounts, deckTotal,
-  playerGenerator, setPlayerGenerator,
-  onInc, onDec, onBack,
+  cardPool, cardImages,
+  onBack,
+  activeDeck, onActiveDeckChange,
 }) {
+  const [decks, setDecks] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("decks") || "[]"); } catch { return []; }
+  });
+  const [editing, setEditing] = useState(activeDeck || { ...EMPTY_DECK, counts: {} });
+  const [editingIdx, setEditingIdx] = useState(null);
+
+  // 検索フィルター
+  const [search, setSearch] = useState("");
+  const [filterAttr, setFilterAttr] = useState("all");
+  const [filterType, setFilterType] = useState("all");
+  const [filterCost, setFilterCost] = useState("all");
+
+  const deckTotal = Object.values(editing.counts).reduce((a, b) => a + b, 0);
+
+  function saveDecks(newDecks) {
+    setDecks(newDecks);
+    localStorage.setItem("decks", JSON.stringify(newDecks));
+  }
+
+  function saveDeck() {
+    if (!editing.name.trim()) { alert("デッキ名を入力してください"); return; }
+    if (deckTotal === 0) { alert("カードを1枚以上追加してください"); return; }
+    const newDecks = [...decks];
+    if (editingIdx !== null) {
+      newDecks[editingIdx] = editing;
+    } else {
+      newDecks.push(editing);
+    }
+    saveDecks(newDecks);
+    onActiveDeckChange(editing);
+    alert("保存しました！");
+  }
+
+  function loadDeck(idx) {
+    setEditing({ ...decks[idx] });
+    setEditingIdx(idx);
+    onActiveDeckChange(decks[idx]);
+  }
+
+  function deleteDeck(idx) {
+    const newDecks = decks.filter((_, i) => i !== idx);
+    saveDecks(newDecks);
+    if (editingIdx === idx) { setEditing({ ...EMPTY_DECK, counts: {} }); setEditingIdx(null); }
+  }
+
+  function newDeck() {
+    setEditing({ ...EMPTY_DECK, counts: {} });
+    setEditingIdx(null);
+  }
+
+  function incCount(id) {
+    if (deckTotal >= 30) return;
+    setEditing(e => ({ ...e, counts: { ...e.counts, [id]: (e.counts[id] || 0) + 1 } }));
+  }
+  function decCount(id) {
+    setEditing(e => ({ ...e, counts: { ...e.counts, [id]: Math.max(0, (e.counts[id] || 0) - 1) } }));
+  }
+
+  // フィルター適用
+  const filtered = cardPool.filter(c => {
+    if (search && !c.name.includes(search)) return false;
+    if (filterAttr !== "all" && c.attr !== filterAttr) return false;
+    if (filterType !== "all" && c.type !== filterType) return false;
+    if (filterCost !== "all" && c.cost !== +filterCost) return false;
+    return true;
+  });
+
   return (
-    <div className="min-h-screen bg-white text-black px-4 py-6">
+    <div className="min-h-screen bg-white text-black px-3 py-4">
       <div className="max-w-sm mx-auto">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-3">
           <button onClick={onBack} className="text-black text-sm">← ロビー</button>
           <h2 className="font-bold tracking-widest">デッキ編成</h2>
-          <div className="text-sm font-mono text-black">{deckTotal}/30</div>
+          <div className="text-sm font-mono">{deckTotal}/30</div>
         </div>
 
-        {/* 発電機選択 */}
-        <div className="border border-black p-3 mb-4">
-          <div className="text-xs font-bold mb-2 flex items-center gap-1"><Zap size={12}/>発電機</div>
-          <div className="grid grid-cols-3 gap-1.5">
+        {/* デッキ名・発電機 */}
+        <div className="border border-black p-2 mb-3 flex flex-col gap-2">
+          <input
+            className="w-full border border-black px-2 py-1 text-sm"
+            placeholder="デッキ名"
+            value={editing.name}
+            onChange={e => setEditing(d => ({ ...d, name: e.target.value }))}
+          />
+          <div className="flex items-center gap-1">
+            <Zap size={12}/>
+            <span className="text-xs font-bold mr-1">発電機:</span>
             {Object.entries(GENERATOR_INFO).map(([key, val]) => (
-              <button
-                key={key}
-                onClick={() => setPlayerGenerator(key)}
-                className={`p-2 border text-xs font-bold ${playerGenerator === key ? "border-black bg-gray-100" : "border-gray-300 hover:border-black"}`}
-              >
-                <div>{val.name}</div>
-                <div className="text-gray-500 font-normal mt-0.5" style={{fontSize:"0.55rem"}}>{val.desc}</div>
+              <button key={key} onClick={() => setEditing(d => ({ ...d, generator: key }))}
+                className={`px-2 py-0.5 text-xs border ${editing.generator === key ? "border-black bg-gray-100 font-bold" : "border-gray-300"}`}>
+                {val.name}
               </button>
             ))}
           </div>
+          <div className="flex gap-2">
+            <button onClick={saveDeck} className="flex-1 bg-black text-white font-bold py-1.5 text-sm">保存</button>
+            <button onClick={newDeck} className="px-3 border border-black text-sm">新規</button>
+          </div>
         </div>
 
-        <div className="space-y-2 pb-8">
-          {cardPool.map(c => (
-            <div key={c.id} className="bg-white border border-black p-2 flex items-center gap-2">
-              {c.image && <img src={c.image} alt="" className="w-8 h-11 object-cover flex-shrink-0"/>}
-              <div className="flex-1 min-w-0">
-                <div className="font-bold text-sm flex items-center flex-wrap">
-                  {c.name}<AttrBadge attr={c.attr}/><TypeBadge type={c.type}/>
+        {/* 保存済みデッキ一覧 */}
+        {decks.length > 0 && (
+          <div className="border border-black p-2 mb-3">
+            <div className="text-xs font-bold mb-1">保存済みデッキ</div>
+            <div className="flex flex-col gap-1">
+              {decks.map((d, i) => (
+                <div key={i} className={`flex items-center gap-2 p-1 border ${editingIdx === i ? "border-black bg-gray-50" : "border-gray-200"}`}>
+                  <button onClick={() => loadDeck(i)} className="flex-1 text-left text-sm font-bold">{d.name}</button>
+                  <span className="text-xs text-gray-500">{GENERATOR_INFO[d.generator]?.name}</span>
+                  <span className="text-xs text-gray-500">{Object.values(d.counts).reduce((a,b)=>a+b,0)}枚</span>
+                  <button onClick={() => deleteDeck(i)} className="text-xs text-gray-400 border border-gray-300 px-1">削</button>
                 </div>
-                <StatRow card={c}/>
-              </div>
-              <button onClick={() => onDec(c.id)} className="w-8 h-8 bg-white border border-black text-lg flex-shrink-0">－</button>
-              <div className="w-6 text-center font-mono flex-shrink-0">{deckCounts[c.id] || 0}</div>
-              <button onClick={() => onInc(c.id)} disabled={deckTotal >= 30} className="w-8 h-8 bg-white border border-black text-lg disabled:opacity-30 flex-shrink-0">＋</button>
+              ))}
             </div>
+          </div>
+        )}
+
+        {/* 検索フィルター */}
+        <div className="border border-black p-2 mb-3 flex flex-col gap-1.5">
+          <input
+            className="w-full border border-black px-2 py-1 text-sm"
+            placeholder="カード名で検索"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          <div className="flex gap-1 flex-wrap">
+            <select className="border border-black px-1 py-0.5 text-xs" value={filterAttr} onChange={e => setFilterAttr(e.target.value)}>
+              <option value="all">全属性</option>
+              {Object.entries(ATTR_LABELS).filter(([,v])=>v).map(([k,v]) => (
+                <option key={k} value={k}>{v}</option>
+              ))}
+            </select>
+            <select className="border border-black px-1 py-0.5 text-xs" value={filterType} onChange={e => setFilterType(e.target.value)}>
+              <option value="all">全種類</option>
+              <option value={TYPES.UNIT}>ユニット</option>
+              <option value={TYPES.TANK}>タンク</option>
+              <option value={TYPES.FACILITY}>施設</option>
+              <option value={TYPES.SPELL}>スペル</option>
+              <option value={TYPES.MAGIC}>魔法</option>
+            </select>
+            <select className="border border-black px-1 py-0.5 text-xs" value={filterCost} onChange={e => setFilterCost(e.target.value)}>
+              <option value="all">全コスト</option>
+              {[0,1,2,3,4,5,6,7,8,9].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* カードグリッド（横3枚） */}
+        <div className="grid gap-2" style={{gridTemplateColumns:"repeat(3,1fr)"}}>
+          {filtered.map(c => (
+            <CardGrid
+              key={c.id}
+              card={c}
+              image={cardImages[c.id] || c.image}
+              count={editing.counts[c.id] || 0}
+              onInc={() => incCount(c.id)}
+              onDec={() => decCount(c.id)}
+            />
           ))}
         </div>
+        <div className="h-8"/>
       </div>
     </div>
   );
