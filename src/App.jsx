@@ -35,38 +35,83 @@ function buildInitialBattleState(cardPool, deckCounts, playerGenerator) {
   };
 }
 
+// localStorageからデッキを読み込む
+function loadActiveDeck() {
+  try {
+    const saved = localStorage.getItem("activeDeck");
+    return saved ? JSON.parse(saved) : null;
+  } catch { return null; }
+}
+
 export default function App() {
   const [cardPool, setCardPool] = useState(INITIAL_CARDS);
-  const [deckCounts, setDeckCounts] = useState(() => {
-    const o = {};
-    INITIAL_CARDS.forEach(c => (o[c.id] = 2));
-    return o;
-  });
-  const [playerGenerator, setPlayerGenerator] = useState("water");
   const [cardImages, setCardImages] = useState({});
   const [screen, setScreen] = useState("lobby");
 
+  // アクティブデッキ（localStorageから初期化）
+  const [activeDeck, setActiveDeck] = useState(() => loadActiveDeck());
+
+  // デッキからdeckCounts/playerGeneratorを導出
+  const deckCounts = activeDeck?.counts || (() => {
+    const o = {};
+    INITIAL_CARDS.forEach(c => (o[c.id] = 2));
+    return o;
+  })();
+  const playerGenerator = activeDeck?.generator || "water";
   const deckTotal = Object.values(deckCounts).reduce((a, b) => a + b, 0);
+
+  function handleActiveDeckChange(deck) {
+    setActiveDeck(deck);
+    localStorage.setItem("activeDeck", JSON.stringify(deck));
+  }
+
+  // PVP送信用コールバック
+  const pushStateRef = useRef(null);
+  const pvpRoleRef = useRef(null);
+
+  function handleAction() {
+    if (pushStateRef.current && pvpRoleRef.current) {
+      // 少し待ってからbattleの最新状態を送信
+      setTimeout(() => {
+        setBattleForPush();
+      }, 10);
+    }
+  }
 
   const {
     battle, confirmLeave,
     startBattle, requestBack, leaveToLobby, endTurn,
     handleCellClick, handleSummon,
     setConfirmLeave, setBattle,
-  } = useBattle(cardPool, deckCounts, playerGenerator);
+  } = useBattle(cardPool, deckCounts, playerGenerator, handleAction);
 
-function handlePVPStateUpdate(newState, status) {
-  if (newState) {
-    setBattle(newState);
-    if (screen !== "battle") setScreen("battle");
+  // battleの最新状態をPVPに送信するための関数
+  const battleRef = useRef(null);
+  battleRef.current = battle;
+
+  function setBattleForPush() {
+    if (pushStateRef.current && battleRef.current) {
+      pushStateRef.current(battleRef.current);
+    }
   }
-}
+
+  function handlePVPStateUpdate(newState, status) {
+    if (newState) {
+      // selectedUnit/selectedSpellはリセット
+      setBattle({ ...newState, selectedUnit: null, selectedSpell: null });
+      if (screen !== "battle") setScreen("battle");
+    }
+  }
 
   const {
     roomId, inputRoomId, setInputRoomId,
     pvpRole, pvpStatus, error,
     createRoom, joinRoom, pushState, leaveRoom,
   } = usePVP(handlePVPStateUpdate);
+
+  // pushState と pvpRole を ref に保存
+  useEffect(() => { pushStateRef.current = pushState; }, [pushState]);
+  useEffect(() => { pvpRoleRef.current = pvpRole; }, [pvpRole]);
 
   // ホスト側: pvpStatusがplayingになったらバトル画面へ
   useEffect(() => {
@@ -75,33 +120,19 @@ function handlePVPStateUpdate(newState, status) {
     }
   }, [pvpStatus]);
 
-  // PVP: ターン終了時に状態を送信
-  const prevActive = useRef(null);
-  useEffect(() => {
-    if (!battle || battle.mode !== "pvp") return;
-    if (prevActive.current !== battle.active) {
-      prevActive.current = battle.active;
-      const myColor = pvpRole === "host" ? "blue" : "red";
-      if (battle.active !== myColor) {
-        pushState(battle);
-      }
-    }
-  }, [battle?.active, battle?.turn]);
-
   async function handleCreateRoom() {
     const initialState = buildInitialBattleState(cardPool, deckCounts, playerGenerator);
     const id = await createRoom(initialState);
     if (id) setBattle(initialState);
   }
 
-async function handleJoinRoom(id) {
-  const state = await joinRoom(id);
-  if (state) {
-    // ゲストはred側でプレイ
-    setBattle({ ...state, firstPlayer: "blue" });
-    setScreen("battle");
+  async function handleJoinRoom(id) {
+    const state = await joinRoom(id);
+    if (state) {
+      setBattle({ ...state, firstPlayer: "blue", selectedUnit: null, selectedSpell: null });
+      setScreen("battle");
+    }
   }
-}
 
   function handleRequestBack() {
     if (battle?.mode === "pvp") leaveRoom();
@@ -115,12 +146,6 @@ async function handleJoinRoom(id) {
     setScreen("lobby");
   }
 
-  function incCount(id) {
-    setDeckCounts(p => deckTotal < 30 ? { ...p, [id]: (p[id] || 0) + 1 } : p);
-  }
-  function decCount(id) {
-    setDeckCounts(p => ({ ...p, [id]: Math.max(0, (p[id] || 0) - 1) }));
-  }
   function addCard(data) {
     const id = Math.max(0, ...cardPool.map(c => typeof c.id === "number" ? c.id : 0)) + 1;
     setCardPool(p => [...p, { id, ...data }]);
@@ -130,14 +155,13 @@ async function handleJoinRoom(id) {
   }
   function deleteCard(id) {
     setCardPool(p => p.filter(c => c.id !== id));
-    setDeckCounts(p => { const n = { ...p }; delete n[id]; return n; });
   }
   function handleImageUpload(cardId, dataUrl) {
     setCardImages(p => ({ ...p, [cardId]: dataUrl }));
     setCardPool(p => p.map(c => c.id === cardId ? { ...c, image: dataUrl } : c));
   }
 
-  const myColor = pvpRole === "host" ? "blue" : "red";
+  const myColor = pvpRole === "host" ? "blue" : pvpRole === "guest" ? "red" : "blue";
   const isPVPMyTurn = !battle || battle.mode !== "pvp" || battle.active === myColor;
 
   if (screen === "battle" && battle) {
@@ -150,7 +174,7 @@ async function handleJoinRoom(id) {
           ? () => { if (isPVPMyTurn) endTurn(); }
           : endTurn}
         onCellClick={battle.mode === "pvp"
-          ? (row, col, extra) => { if (isPVPMyTurn) handleCellClick(row, col, extra); }
+          ? (row, col, extra) => { if (isPVPMyTurn || row === -1) handleCellClick(row, col, extra); }
           : handleCellClick}
         onSummon={battle.mode === "pvp"
           ? (hi, row, col) => { if (isPVPMyTurn) handleSummon(hi, row, col); }
@@ -164,9 +188,10 @@ async function handleJoinRoom(id) {
   if (screen === "deck") {
     return (
       <DeckScreen
-        cardPool={cardPool} deckCounts={deckCounts} deckTotal={deckTotal}
-        playerGenerator={playerGenerator} setPlayerGenerator={setPlayerGenerator}
-        onInc={incCount} onDec={decCount}
+        cardPool={cardPool}
+        cardImages={cardImages}
+        activeDeck={activeDeck}
+        onActiveDeckChange={handleActiveDeckChange}
         onBack={() => setScreen("lobby")}
       />
     );
@@ -175,6 +200,7 @@ async function handleJoinRoom(id) {
     return (
       <DexScreen
         cardPool={cardPool}
+        cardImages={cardImages}
         onAddCard={addCard} onEditCard={editCard} onDeleteCard={deleteCard}
         onBack={() => setScreen("lobby")}
         onImageUpload={handleImageUpload}
@@ -184,7 +210,7 @@ async function handleJoinRoom(id) {
   return (
     <LobbyScreen
       playerGenerator={playerGenerator}
-      setPlayerGenerator={setPlayerGenerator}
+      setPlayerGenerator={gen => handleActiveDeckChange({ ...activeDeck, generator: gen })}
       deckTotal={deckTotal}
       onStart={mode => { startBattle(mode); setScreen("battle"); }}
       onNav={setScreen}
