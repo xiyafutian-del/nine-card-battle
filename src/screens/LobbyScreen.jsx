@@ -96,23 +96,6 @@ export function LobbyScreen({
           </div>
         </div>
 
-        {/* 発電機選択 */}
-        <div className="border border-black p-3 mt-4">
-          <div className="text-xs font-bold mb-2 flex items-center gap-1"><Zap size={12}/>発電機選択</div>
-          <div className="grid grid-cols-3 gap-1.5">
-            {Object.entries(GENERATOR_INFO).map(([key, val]) => (
-              <button
-                key={key}
-                onClick={() => setPlayerGenerator(key)}
-                className={`p-2 border text-xs font-bold ${playerGenerator === key ? "border-black bg-gray-100" : "border-gray-300 hover:border-black"}`}
-              >
-                <div>{val.name}</div>
-                <div className="text-gray-500 font-normal mt-0.5 leading-tight" style={{fontSize:"0.55rem"}}>{val.desc}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* ヘルプ */}
         <button onClick={() => setHelpOpen(h => !h)} className="w-full mt-4 text-left text-sm text-gray-600 border-t border-gray-300 pt-3 flex justify-between">
           <span>ルール早見表</span><span>{helpOpen ? "▲" : "▼"}</span>
