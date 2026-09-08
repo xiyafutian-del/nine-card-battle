@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Zap } from 'lucide-react';
 import { ATTRS, ATTR_LABELS, GENERATOR_INFO, TYPES, RANGE_TYPE } from '../constants/index.js';
 import { CardGrid } from '../components/CardParts.jsx';
 
@@ -10,24 +9,22 @@ function rangeText(card) {
   return `□${card.hRange || 1}×${card.vRange || 1}`;
 }
 
-export function DeckScreen({
-  cardPool, cardImages,
-  onBack,
-  activeDeck, onActiveDeckChange,
-}) {
+export function DeckScreen({ cardPool, cardImages, onBack, activeDeck, onActiveDeckChange }) {
   const [decks, setDecks] = useState(() => {
     try { return JSON.parse(localStorage.getItem("decks") || "[]"); } catch { return []; }
   });
-  const [editing, setEditing] = useState(activeDeck || { ...EMPTY_DECK, counts: {} });
+
+  // activeDeck が null でも安全に初期化
+  const [editing, setEditing] = useState({ ...EMPTY_DECK, ...(activeDeck || {}) });
   const [editingIdx, setEditingIdx] = useState(null);
 
-  // 検索フィルター
   const [search, setSearch] = useState("");
   const [filterAttr, setFilterAttr] = useState("all");
   const [filterType, setFilterType] = useState("all");
   const [filterCost, setFilterCost] = useState("all");
 
-  const deckTotal = Object.values(editing.counts).reduce((a, b) => a + b, 0);
+  const deckTotal = Object.values(editing.counts || {}).reduce((a, b) => a + b, 0);
+  const currentGen = GENERATOR_INFO[editing.generator] || GENERATOR_INFO.water;
 
   function saveDecks(newDecks) {
     setDecks(newDecks);
@@ -38,18 +35,15 @@ export function DeckScreen({
     if (!editing.name.trim()) { alert("デッキ名を入力してください"); return; }
     if (deckTotal === 0) { alert("カードを1枚以上追加してください"); return; }
     const newDecks = [...decks];
-    if (editingIdx !== null) {
-      newDecks[editingIdx] = editing;
-    } else {
-      newDecks.push(editing);
-    }
+    if (editingIdx !== null) newDecks[editingIdx] = editing;
+    else newDecks.push(editing);
     saveDecks(newDecks);
     onActiveDeckChange(editing);
     alert("保存しました！");
   }
 
   function loadDeck(idx) {
-    setEditing({ ...decks[idx] });
+    setEditing({ ...EMPTY_DECK, ...decks[idx] });
     setEditingIdx(idx);
     onActiveDeckChange(decks[idx]);
   }
@@ -57,11 +51,11 @@ export function DeckScreen({
   function deleteDeck(idx) {
     const newDecks = decks.filter((_, i) => i !== idx);
     saveDecks(newDecks);
-    if (editingIdx === idx) { setEditing({ ...EMPTY_DECK, counts: {} }); setEditingIdx(null); }
+    if (editingIdx === idx) { setEditing({ ...EMPTY_DECK }); setEditingIdx(null); }
   }
 
   function newDeck() {
-    setEditing({ ...EMPTY_DECK, counts: {} });
+    setEditing({ ...EMPTY_DECK });
     setEditingIdx(null);
   }
 
@@ -73,7 +67,6 @@ export function DeckScreen({
     setEditing(e => ({ ...e, counts: { ...e.counts, [id]: Math.max(0, (e.counts[id] || 0) - 1) } }));
   }
 
-  // フィルター適用
   const filtered = cardPool.filter(c => {
     if (search && !c.name.includes(search)) return false;
     if (filterAttr !== "all" && c.attr !== filterAttr) return false;
@@ -96,19 +89,24 @@ export function DeckScreen({
           <input
             className="w-full border border-black px-2 py-1 text-sm"
             placeholder="デッキ名"
-            value={editing.name}
+            value={editing.name || ""}
             onChange={e => setEditing(d => ({ ...d, name: e.target.value }))}
           />
-          <div className="flex items-center gap-1">
-            <Zap size={12}/>
-            <span className="text-xs font-bold mr-1">発電機:</span>
+
+          {/* 発電機選択＋性能表示 */}
+          <div className="text-xs font-bold mb-0.5">発電機</div>
+          <div className="grid grid-cols-3 gap-1">
             {Object.entries(GENERATOR_INFO).map(([key, val]) => (
-              <button key={key} onClick={() => setEditing(d => ({ ...d, generator: key }))}
-                className={`px-2 py-0.5 text-xs border ${editing.generator === key ? "border-black bg-gray-100 font-bold" : "border-gray-300"}`}>
-                {val.name}
+              <button key={key}
+                onClick={() => setEditing(d => ({ ...d, generator: key }))}
+                className={`p-1.5 border text-xs flex flex-col items-center ${editing.generator === key ? "border-black bg-gray-100 font-bold" : "border-gray-300"}`}
+              >
+                <span>{val.name}</span>
+                <span className="text-gray-500 font-normal leading-tight mt-0.5" style={{fontSize:"0.5rem"}}>{val.desc}</span>
               </button>
             ))}
           </div>
+
           <div className="flex gap-2">
             <button onClick={saveDeck} className="flex-1 bg-black text-white font-bold py-1.5 text-sm">保存</button>
             <button onClick={newDeck} className="px-3 border border-black text-sm">新規</button>
@@ -121,11 +119,11 @@ export function DeckScreen({
             <div className="text-xs font-bold mb-1">保存済みデッキ</div>
             <div className="flex flex-col gap-1">
               {decks.map((d, i) => (
-                <div key={i} className={`flex items-center gap-2 p-1 border ${editingIdx === i ? "border-black bg-gray-50" : "border-gray-200"}`}>
-                  <button onClick={() => loadDeck(i)} className="flex-1 text-left text-sm font-bold">{d.name}</button>
-                  <span className="text-xs text-gray-500">{GENERATOR_INFO[d.generator]?.name}</span>
-                  <span className="text-xs text-gray-500">{Object.values(d.counts).reduce((a,b)=>a+b,0)}枚</span>
-                  <button onClick={() => deleteDeck(i)} className="text-xs text-gray-400 border border-gray-300 px-1">削</button>
+                <div key={i} className={`flex items-center gap-2 p-1 border ${editingIdx===i?"border-black bg-gray-50":"border-gray-200"}`}>
+                  <button onClick={() => loadDeck(i)} className="flex-1 text-left text-sm font-bold truncate">{d.name}</button>
+                  <span className="text-xs text-gray-500 flex-shrink-0">{GENERATOR_INFO[d.generator]?.name}</span>
+                  <span className="text-xs text-gray-500 flex-shrink-0">{Object.values(d.counts||{}).reduce((a,b)=>a+b,0)}枚</span>
+                  <button onClick={() => deleteDeck(i)} className="text-xs text-gray-400 border border-gray-300 px-1 flex-shrink-0">削</button>
                 </div>
               ))}
             </div>
@@ -143,7 +141,7 @@ export function DeckScreen({
           <div className="flex gap-1 flex-wrap">
             <select className="border border-black px-1 py-0.5 text-xs" value={filterAttr} onChange={e => setFilterAttr(e.target.value)}>
               <option value="all">全属性</option>
-              {Object.entries(ATTR_LABELS).filter(([,v])=>v).map(([k,v]) => (
+              {Object.entries(ATTR_LABELS).filter(([,v])=>v).map(([k,v])=>(
                 <option key={k} value={k}>{v}</option>
               ))}
             </select>
@@ -157,7 +155,7 @@ export function DeckScreen({
             </select>
             <select className="border border-black px-1 py-0.5 text-xs" value={filterCost} onChange={e => setFilterCost(e.target.value)}>
               <option value="all">全コスト</option>
-              {[0,1,2,3,4,5,6,7,8,9].map(n => <option key={n} value={n}>{n}</option>)}
+              {[0,1,2,3,4,5,6,7,8,9].map(n=><option key={n} value={n}>{n}</option>)}
             </select>
           </div>
         </div>
@@ -168,8 +166,8 @@ export function DeckScreen({
             <CardGrid
               key={c.id}
               card={c}
-              image={cardImages[c.id] || c.image}
-              count={editing.counts[c.id] || 0}
+              image={cardImages?.[c.id] || c.image}
+              count={editing.counts?.[c.id] || 0}
               onInc={() => incCount(c.id)}
               onDec={() => decCount(c.id)}
             />
