@@ -1,6 +1,12 @@
 import { UnitCell } from './CardParts.jsx';
 import { rowToCoord, getAttackTargets, getMovable } from '../engine/battle.js';
 
+const CELL = 90; // マスサイズ
+const COLS = 3;
+const ROWS = 6;
+const W = CELL * COLS; // 270
+const H = CELL * ROWS; // 540
+
 export function Board({
   board, active, selectedUnit, selectedSpell, gameOver,
   mode, turn, firstPlayer,
@@ -55,28 +61,39 @@ export function Board({
     });
   }
 
-  // flipped=true のとき行を逆順（ゲスト視点: red が手前）
   const rowOrder = flipped ? [5,4,3,2,1,0] : [0,1,2,3,4,5];
 
   return (
     <div className="flex gap-1 mx-auto flex-shrink-0" style={{width:"fit-content"}}>
+      {/* 盤面 */}
       <div
         className="relative flex-shrink-0 bg-white border border-black"
-        style={{touchAction:"none"}}
+        style={{width:`${W}px`, height:`${H}px`, touchAction:"none"}}
         onDragLeave={onDragLeave}
       >
         {/* 格子線SVG */}
-        <svg className="absolute inset-0 pointer-events-none" style={{width:"179px",height:"518px",zIndex:0}} viewBox="0 0 179 518">
-          <line x1="59"  y1="0" x2="59"  y2="518" stroke="black" strokeWidth="1"/>
-          <line x1="119" y1="0" x2="119" y2="518" stroke="black" strokeWidth="1"/>
-          {[86,172,258,344,430].map(y => (
-            <line key={y} x1="0" y1={y} x2="179" y2={y} stroke="black" strokeWidth={y===258?"2":"1"}/>
+        <svg className="absolute inset-0 pointer-events-none" width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{zIndex:0}}>
+          {/* 縦線 */}
+          {[CELL, CELL*2].map(x=>(
+            <line key={x} x1={x} y1="0" x2={x} y2={H} stroke="black" strokeWidth="1"/>
+          ))}
+          {/* 横線 */}
+          {[1,2,3,4,5].map(r=>(
+            <line key={r} x1="0" y1={r*CELL} x2={W} y2={r*CELL}
+              stroke="black" strokeWidth={r===3?"2":"1"}/>
           ))}
         </svg>
+
         {/* セル */}
-        <div className="relative grid" style={{gridTemplateColumns:"repeat(3,59px)",gridTemplateRows:"repeat(6,86px)",width:"179px",height:"518px"}}>
+        <div
+          className="absolute inset-0 grid"
+          style={{
+            gridTemplateColumns:`repeat(${COLS},${CELL}px)`,
+            gridTemplateRows:`repeat(${ROWS},${CELL}px)`,
+          }}
+        >
           {rowOrder.flatMap((row) =>
-            Array.from({length:3}).map((__, col) => {
+            Array.from({length:COLS}).map((__, col) => {
               const {side, idx} = rowToCoord(row);
               const cellKey = `${row}-${col}`;
               const unitKey = `${side}-${col}-${idx}`;
@@ -86,7 +103,7 @@ export function Board({
               const isMov    = moveSet.has(unitKey);
               const isDrop   = dropableSet.has(cellKey);
               const isGrowth = growthSet.has(unitKey);
-              const isInsert = dropPreview && side === active && col === dropPreview.col && idx === dropPreview.insertIdx;
+              const isInsert = dropPreview && side===active && col===dropPreview.col && idx===dropPreview.insertIdx;
               const isPushed = unit && pushedUnits.has(unit.uid);
 
               let bgColor = "transparent";
@@ -101,18 +118,29 @@ export function Board({
               return (
                 <div
                   key={cellKey}
-                  style={{width:"59px",height:"86px",backgroundColor:bgColor,position:"relative",zIndex:1}}
-                  className={canTap || isAtk || isMov ? "cursor-pointer" : ""}
-                  onClick={() => { if(!gameOver) onCellClick(row, col); }}
-                  onDragOver={e => onDragOver(e, row, col)}
-                  onDrop={e => onDrop(e, row, col)}
+                  style={{
+                    width:`${CELL}px`, height:`${CELL}px`,
+                    backgroundColor: bgColor,
+                    position:"relative", zIndex:1,
+                  }}
+                  className={canTap||isAtk||isMov ? "cursor-pointer" : ""}
+                  onClick={()=>{ if(!gameOver) onCellClick(row,col); }}
+                  onDragOver={e=>onDragOver(e,row,col)}
+                  onDrop={e=>onDrop(e,row,col)}
                 >
-                  {isInsert && (
+                  {isInsert&&(
                     <div className="absolute top-0 left-0 right-0 flex justify-center z-20 pointer-events-none">
                       <div className="text-black text-xs font-bold">▼</div>
                     </div>
                   )}
-                  {unit && <UnitCell unit={unit} pushed={isPushed}/>}
+                  {/* カードを59x86でセル中央に配置 */}
+                  {unit && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div style={{width:"59px", height:"86px"}}>
+                        <UnitCell unit={unit} pushed={isPushed}/>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })
