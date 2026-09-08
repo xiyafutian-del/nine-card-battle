@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { CORE_CARD, INITIAL_CARDS } from '../constants/cards.js';
 import { getGeneratorCost } from '../constants/index.js';
-import { makeUnitFromCard, shuffle } from '../engine/effects.js';
-import { cloneBoard, buildDeck, checkVictory, applyTurnStart, summonUnit, attackUnit, activateCard, getAttackTargets, getMovable, rowToCoord } from '../engine/battle.js';
+import { makeUnitFromCard } from '../engine/effects.js';
+import { cloneBoard, buildDeck, checkVictory, applyTurnStart,
+         summonUnit, attackUnit, activateCard,
+         getAttackTargets, getMovable, rowToCoord } from '../engine/battle.js';
 import { runAITurn } from '../engine/ai.js';
 
 function initBattle(mode, cardPool, deckCounts, playerGenerator) {
@@ -13,10 +15,8 @@ function initBattle(mode, cardPool, deckCounts, playerGenerator) {
   const pHand = pDeck.splice(0, 4);
   const rHand = rDeck.splice(0, 4);
   const board = { blue: [[], [], []], red: [[], [], []] };
-  const core = makeUnitFromCard(CORE_CARD);
-  board.blue[1] = [{ ...core, uid: "core-blue" }];
+  board.blue[1] = [{ ...makeUnitFromCard(CORE_CARD), uid: "core-blue" }];
   board.red[1]  = [{ ...makeUnitFromCard(CORE_CARD), uid: "core-red" }];
-
   let state = {
     board,
     playerDeck: pDeck, aiDeck: rDeck,
@@ -32,9 +32,8 @@ function initBattle(mode, cardPool, deckCounts, playerGenerator) {
   return state;
 }
 
-export function useBattle(cardPool, deckCounts, playerGenerator) {
+export function useBattle(cardPool, deckCounts, playerGenerator, onAction) {
   const [battle, setBattle] = useState(null);
-  const [screen, setScreen] = useState("lobby");
   const [confirmLeave, setConfirmLeave] = useState(false);
 
   // AI ターン
@@ -60,8 +59,6 @@ export function useBattle(cardPool, deckCounts, playerGenerator) {
 
   function startBattle(mode) {
     setBattle(initBattle(mode, cardPool, deckCounts, playerGenerator));
-    setScreen("battle");
-    setConfirmLeave(false);
   }
 
   function requestBack() {
@@ -69,7 +66,8 @@ export function useBattle(cardPool, deckCounts, playerGenerator) {
     leaveToLobby();
   }
   function leaveToLobby() {
-    setBattle(null); setScreen("lobby"); setConfirmLeave(false);
+    setBattle(null);
+    setConfirmLeave(false);
   }
 
   function endTurn() {
@@ -78,7 +76,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator) {
       const board = cloneBoard(prev.board);
       const next = prev.active === "blue" ? "red" : "blue";
       board[next].forEach(col => col.forEach(u => u && (u.acted = false)));
-      // temp ATK up をリセット
+      // temp ATK リセット
       board[next].forEach(col => col.forEach(u => {
         if (u?.atkTempUp) { u.atk -= u.atkTempUp; u.atkTempUp = 0; }
       }));
@@ -86,15 +84,23 @@ export function useBattle(cardPool, deckCounts, playerGenerator) {
       if (vc.over) return { ...prev, board, gameOver: vc.winner, log: [...prev.log, vc.reason] };
       let ns = { ...prev, board, active: next, turn: prev.turn + 1, selectedUnit: null, selectedSpell: null };
       ns = applyTurnStart(ns, next, next === "blue" ? prev.playerGenerator : prev.aiGenerator);
-      ns.log = [...ns.log, `${next === "blue" ? "あなた" : "相手"}のターン (Turn ${ns.turn})`];
+      ns.log = [...ns.log, `${next==="blue"?"あなた":"相手"}のターン (Turn ${ns.turn})`];
       return ns;
     });
+    // ターン終了は常に送信
+    setTimeout(() => onAction?.(), 50);
   }
 
-  function handleCellClick(row, col) {
+  function handleCellClick(row, col, extra) {
     setBattle(prev => {
       if (!prev || prev.gameOver) return prev;
       if (prev.mode === "pve" && prev.active === "red") return prev;
+
+      // 盤面外タップ（row=-1）→ 選択キャンセル
+      if (row === -1 && !extra?.spell) {
+        return { ...prev, selectedUnit: null, selectedSpell: null };
+      }
+
       const { side, idx } = rowToCoord(row);
       const { active, selectedUnit, selectedSpell } = prev;
       const enem = active === "blue" ? "red" : "blue";
@@ -103,14 +109,15 @@ export function useBattle(cardPool, deckCounts, playerGenerator) {
       // スペル対象指定中
       if (selectedSpell) {
         const { handIndex, card } = selectedSpell;
-        const unit = prev.board[side][col][idx];
+        const unit = prev.board[side]?.[col]?.[idx];
         if (!unit) return { ...prev, selectedSpell: null };
         const tType = card.targetType;
-        if (tType === "enemy" && side !== enem) return prev;
-        if (tType === "enemy_noncore" && (side !== enem || unit.isCore)) return prev;
-        if (tType === "ally" && side !== active) return prev;
-        if (tType === "ally_wall" && (side !== active || unit.attr !== "wall")) return prev;
+        if (tType === "enemy" && side !== enem) return { ...prev, selectedSpell: null };
+        if (tType === "enemy_noncore" && (side !== enem || unit.isCore)) return { ...prev, selectedSpell: null };
+        if (tType === "ally" && side !== active) return { ...prev, selectedSpell: null };
+        if (tType === "ally_wall" && (side !== active || unit.attr !== "wall")) return { ...prev, selectedSpell: null };
         const ns = activateCard(prev, active, handIndex, { side, col, idx });
+        setTimeout(() => onAction?.(), 50);
         return { ...ns, selectedSpell: null };
       }
 
@@ -124,6 +131,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator) {
           const valid = getAttackTargets(active, su.col, su.idx, attacker, prev.board);
           if (valid.some(t => t.col === col && t.idx === idx)) {
             const ns = attackUnit(prev, active, su.col, su.idx, col, idx);
+            setTimeout(() => onAction?.(), 50);
             return { ...ns, selectedUnit: null };
           }
           return { ...prev, selectedUnit: null };
@@ -137,20 +145,21 @@ export function useBattle(cardPool, deckCounts, playerGenerator) {
             const unit = board[active][su.col].splice(su.idx, 1)[0];
             unit.acted = true;
             board[active][col].splice(idx, 0, unit);
-            return { ...prev, board, selectedUnit: null, log: [...prev.log, `${unit.name}が移動した`] };
+            const ns = { ...prev, board, selectedUnit: null, log: [...prev.log, `${unit.name}が移動した`] };
+            setTimeout(() => onAction?.(), 50);
+            return ns;
           }
           // 成長効果
           const u = prev.board[side][col][idx];
           if (u?.effect?.action === "growth" && !u.acted && u.summonedTurn !== prev.turn) {
-            const ns = activateCard(prev, active, -1, null);
-            // growth は activateCard ではなく直接処理
             const board2 = cloneBoard(prev.board);
             const hand2 = active === "blue" ? [...prev.playerHand] : [...prev.aiHand];
             const grave2 = active === "blue" ? [...(prev.playerGrave||[])] : [...(prev.aiGrave||[])];
             const log2 = [...prev.log];
             const e = u.effect;
             const attrs = Array.isArray(e.filter?.attr) ? e.filter.attr : [e.filter?.attr];
-            const candidates = hand2.filter(c => attrs.includes(c.attr) && c.cost <= (e.maxCost || 99)).sort((a,b) => b.cost - a.cost);
+            const candidates = hand2.filter(c => attrs.includes(c.attr) && c.cost <= (e.maxCost||99))
+                                    .sort((a,b) => b.cost - a.cost);
             if (candidates.length > 0) {
               const card = candidates[0];
               const hi = hand2.findIndex(c => c._k === card._k);
@@ -159,8 +168,12 @@ export function useBattle(cardPool, deckCounts, playerGenerator) {
               board2[active][col].splice(Math.min(idx, board2[active][col].length), 0, makeUnitFromCard(card));
               hand2.splice(hi, 1);
               log2.push(`${self?.name}が成長→${card.name}召喚`);
-              const costUpd = active === "blue" ? { playerHand: hand2, playerGrave: grave2 } : { aiHand: hand2, aiGrave: grave2 };
-              return { ...prev, board: board2, log: log2, selectedUnit: null, ...costUpd };
+              const costUpd = active === "blue"
+                ? { playerHand: hand2, playerGrave: grave2 }
+                : { aiHand: hand2, aiGrave: grave2 };
+              const ns = { ...prev, board: board2, log: log2, selectedUnit: null, ...costUpd };
+              setTimeout(() => onAction?.(), 50);
+              return ns;
             }
             return { ...prev, log: [...prev.log, "成長: 条件カードなし"], selectedUnit: null };
           }
@@ -184,26 +197,48 @@ export function useBattle(cardPool, deckCounts, playerGenerator) {
     setBattle(prev => {
       if (!prev || prev.gameOver) return prev;
       const { active } = prev;
+
+      // row=-1 はスペル発動（盤面外）
+      if (row === -1) {
+        const hand = active === "blue" ? prev.playerHand : prev.aiHand;
+        const card = hand[handIndex];
+        if (!card) return prev;
+        if (card.type === "spell" || card.type === "magic") {
+          if (!card.targetType || card.targetType === "none") {
+            const ns = activateCard(prev, active, handIndex, null);
+            setTimeout(() => onAction?.(), 50);
+            return ns;
+          }
+          return { ...prev, selectedSpell: { handIndex, card } };
+        }
+        return prev;
+      }
+
       const { side, idx } = rowToCoord(row);
       if (side !== active) return prev;
       const hand = active === "blue" ? prev.playerHand : prev.aiHand;
       const card = hand[handIndex];
       if (!card) return prev;
-      // スペル・魔法はタップで発動
+
       if (card.type === "spell" || card.type === "magic") {
-        if (card.targetType === "none" || !card.targetType) {
-          return activateCard(prev, active, handIndex, null);
+        if (!card.targetType || card.targetType === "none") {
+          const ns = activateCard(prev, active, handIndex, null);
+          setTimeout(() => onAction?.(), 50);
+          return ns;
         }
         return { ...prev, selectedSpell: { handIndex, card } };
       }
-      return summonUnit(prev, active, handIndex, col, idx);
+
+      const ns = summonUnit(prev, active, handIndex, col, idx);
+      setTimeout(() => onAction?.(), 50);
+      return ns;
     });
   }
 
   return {
-    battle, screen, confirmLeave,
+    battle, confirmLeave,
     startBattle, requestBack, leaveToLobby, endTurn,
     handleCellClick, handleSummon,
-    setScreen, setConfirmLeave,setBattle,
+    setConfirmLeave, setBattle,
   };
-}
+                                     }
