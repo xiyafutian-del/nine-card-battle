@@ -154,41 +154,52 @@ export function CardFace({ card, image }) {
 export function CardGrid({ card, image, count, onInc, onDec }) {
   const isSpellMagic = card.type === TYPES.SPELL || card.type === TYPES.MAGIC;
   return (
-    <div className="relative flex flex-col bg-white border border-black overflow-hidden"
+    <div className="relative flex flex-col bg-white border-2 border-black overflow-hidden rounded-sm"
       style={{width:"100%", aspectRatio:"59/86"}}>
-      <CostTag cost={card.cost}/>
-      {/* カード名 */}
-      <div className="text-center font-bold leading-tight truncate border-b border-black"
-        style={{fontSize:"0.52rem", padding:"1px 4px 1px 18px"}}>
-        {card.name}
+
+      {/* 上部: コストボックス + 名前 */}
+      <div className="flex items-stretch border-b-2 border-black flex-shrink-0">
+        {/* コストボックス */}
+        <div className="border-r-2 border-black flex items-center justify-center flex-shrink-0"
+          style={{width:"28%", minHeight:"22px"}}>
+          <span className="font-bold" style={{fontSize:"0.7rem"}}>{card.cost}</span>
+        </div>
+        {/* 名前 */}
+        <div className="flex items-center px-1 overflow-hidden flex-1">
+          <span className="font-bold truncate" style={{fontSize:"0.48rem"}}>{card.name}</span>
+        </div>
       </div>
+
       {/* イラスト */}
-      <div className="relative border-b border-black" style={{flex:"1 1 0", minHeight:0}}>
+      <div className="relative flex-shrink-0" style={{height:"45%"}}>
         {image
           ? <img src={image} alt="" className="absolute inset-0 w-full h-full object-cover"/>
-          : <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
-              <span className="text-gray-300" style={{fontSize:"0.45rem"}}>
-                {ATTR_LABELS[card.attr]||""}
-              </span>
+          : <div className="absolute inset-0 bg-gray-50 flex items-center justify-center">
+              <span className="text-gray-300" style={{fontSize:"0.4rem"}}>{ATTR_LABELS[card.attr]||""}</span>
             </div>
         }
       </div>
-      {/* ステータス */}
-      {!isSpellMagic && (
-        <div className="flex items-center justify-between border-b border-black"
-          style={{fontSize:"0.45rem", padding:"0 2px"}}>
-          <span className="font-bold">{card.atk > 0 ? card.atk : "－"}</span>
-          <span className="text-gray-500" style={{fontSize:"0.4rem"}}>{rangeText(card)}</span>
-          <span className="font-bold">{card.hp}</span>
+
+      {/* 下部: ステータス + 効果 */}
+      <div className="border-t-2 border-black flex flex-col flex-1 overflow-hidden">
+        {/* ATK・射程・HP */}
+        {!isSpellMagic && (
+          <div className="flex items-center justify-between border-b border-black flex-shrink-0"
+            style={{fontSize:"0.48rem", padding:"1px 3px"}}>
+            <span className="font-bold">{card.atk > 0 ? card.atk : "－"}</span>
+            <span>{rangeText(card)}</span>
+            <span className="font-bold">{card.hp}</span>
+          </div>
+        )}
+        {/* 効果テキスト */}
+        <div className="flex-1 overflow-hidden" style={{padding:"1px 3px"}}>
+          <span className="text-black leading-tight" style={{fontSize:"0.38rem"}}>{card.desc||""}</span>
         </div>
-      )}
-      {/* 効果テキスト */}
-      <div style={{fontSize:"0.38rem", padding:"1px 2px", minHeight:"10px"}}>
-        <span className="text-gray-600 leading-tight">{card.desc||""}</span>
       </div>
+
       {/* デッキ枚数 */}
       {onInc && (
-        <div className="flex items-center justify-between border-t border-black"
+        <div className="flex items-center justify-between border-t-2 border-black flex-shrink-0"
           style={{padding:"1px 2px"}}>
           <button onClick={onDec}
             className="w-5 h-5 border border-black font-bold flex items-center justify-center"
@@ -201,4 +212,4 @@ export function CardGrid({ card, image, count, onInc, onDec }) {
       )}
     </div>
   );
-                  }
+}
