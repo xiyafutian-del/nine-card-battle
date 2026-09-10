@@ -158,20 +158,20 @@ export function CardGrid({ card, image, count, onInc, onDec }) {
       style={{width:"100%", aspectRatio:"59/86"}}>
 
       {/* 上部: コストボックス + 名前 */}
-      <div className="flex items-stretch border-b-2 border-black flex-shrink-0">
-        {/* コストボックス */}
-        <div className="border-r-2 border-black flex items-center justify-center flex-shrink-0"
-          style={{width:"28%", minHeight:"22px"}}>
+      <div className="flex items-start flex-shrink-0">
+        {/* コスト（正方形） */}
+        <div className="border-r-2 border-b-2 border-black flex items-center justify-center flex-shrink-0"
+          style={{width:"28px", height:"28px"}}>
           <span className="font-bold" style={{fontSize:"0.7rem"}}>{card.cost}</span>
         </div>
-        {/* 名前 */}
-        <div className="flex items-center px-1 overflow-hidden flex-1">
+        {/* 名前（下枠なし） */}
+        <div className="flex items-center px-1 overflow-hidden flex-1" style={{height:"28px"}}>
           <span className="font-bold truncate" style={{fontSize:"0.48rem"}}>{card.name}</span>
         </div>
       </div>
 
       {/* イラスト */}
-      <div className="relative flex-shrink-0" style={{height:"45%"}}>
+      <div className="relative border-t-2 border-b-2 border-black flex-shrink-0" style={{height:"42%"}}>
         {image
           ? <img src={image} alt="" className="absolute inset-0 w-full h-full object-cover"/>
           : <div className="absolute inset-0 bg-gray-50 flex items-center justify-center">
@@ -181,8 +181,7 @@ export function CardGrid({ card, image, count, onInc, onDec }) {
       </div>
 
       {/* 下部: ステータス + 効果 */}
-      <div className="border-t-2 border-black flex flex-col flex-1 overflow-hidden">
-        {/* ATK・射程・HP */}
+      <div className="flex flex-col flex-1 overflow-hidden">
         {!isSpellMagic && (
           <div className="flex items-center justify-between border-b border-black flex-shrink-0"
             style={{fontSize:"0.48rem", padding:"1px 3px"}}>
@@ -191,7 +190,6 @@ export function CardGrid({ card, image, count, onInc, onDec }) {
             <span className="font-bold">{card.hp}</span>
           </div>
         )}
-        {/* 効果テキスト */}
         <div className="flex-1 overflow-hidden" style={{padding:"1px 3px"}}>
           <span className="text-black leading-tight" style={{fontSize:"0.38rem"}}>{card.desc||""}</span>
         </div>
