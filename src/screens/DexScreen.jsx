@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Upload } from 'lucide-react';
 import { TYPES, ATTRS, ATTR_LABELS, RANGE_TYPE } from '../constants/index.js';
-import { CardGrid } from '../components/CardParts.jsx';
+import { CardGrid } from '../components/CardDesign.jsx';
 
 const BLANK_FORM = {
   name:"", cost:1, hp:1, atk:1, hRange:1, vRange:1,
