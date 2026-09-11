@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { CardFace } from './CardParts.jsx';
+import { CardFace } from './CardDesign.jsx';
 import { TYPES } from '../constants/index.js';
 
 export function HandFan({
