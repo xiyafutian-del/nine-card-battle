@@ -9,49 +9,44 @@ export function rangeText(card) {
   return `□${card.hRange || 1}×${card.vRange || 1}`;
 }
 
-function FitText({ text, maxSize = 0.55, minSize = 0.3, style = {} }) {
+// 全サイズをcardWに対する%・vwではなくcssのfont-size継承で制御
+// 親要素のfont-sizeをcardWに比例させ、子要素はemで指定する
+
+function FitText({ text, maxEm = 0.55, minEm = 0.3 }) {
   const len = (text || "").length;
-  const size = len <= 6  ? maxSize
-             : len <= 9  ? maxSize * 0.85
-             : len <= 12 ? maxSize * 0.72
-             : minSize;
+  const size = len <= 6  ? maxEm
+             : len <= 9  ? maxEm * 0.85
+             : len <= 12 ? maxEm * 0.72
+             : minEm;
   return (
-    <span style={{ fontSize:`${size}rem`, lineHeight:1.1, ...style }}>
+    <span style={{ fontSize:`${size}em`, lineHeight:1.1 }}>
       {text}
     </span>
   );
 }
 
-const COST_RATIO = 0.30;
-
-// border幅をカードサイズに応じてスケール
-function borderW(cardW) {
-  return Math.max(1, Math.round(cardW / 30));
-}
-
-export function CardLayout({ card, image, extraBottom, dimmed = false, acted = false, cardW = CARD_W }) {
+export function CardLayout({ card, image, extraBottom, dimmed = false, acted = false }) {
   const isSpellMagic = card.type === TYPES.SPELL || card.type === TYPES.MAGIC;
   const isCore = card.isCore || card.id === "core";
-  const bw = borderW(cardW); // ボーダー幅(px)
-  const bs = `${bw}px solid black`;
-  const fs = cardW / CARD_W; // フォントスケール係数
+
+  // 全サイズはemで、外側のfont-sizeに依存する
+  // border幅もcalcで親のfont-sizeに比例
+  const bs = "0.08em solid black";
 
   if (isCore) {
     return (
-      <div
-        className="relative flex flex-col bg-white overflow-hidden"
-        style={{ width:"100%", height:"100%", borderRadius:`${3*fs}px`, border:bs }}
-      >
+      <div className="relative flex flex-col bg-white overflow-hidden"
+        style={{ width:"100%", height:"100%", border:bs, borderRadius:"0.15em" }}>
         <div className="flex items-center justify-center flex-shrink-0"
           style={{ height:"30%", borderBottom:bs }}>
-          <span className="font-bold" style={{ fontSize:`${0.6*fs}rem` }}>コア</span>
+          <span className="font-bold" style={{ fontSize:"0.6em" }}>コア</span>
         </div>
         <div className="flex-1 flex items-center justify-center">
-          <span className="font-bold" style={{ fontSize:`${1.4*fs}rem` }}>{card.hp}</span>
+          <span className="font-bold" style={{ fontSize:"1.4em" }}>{card.hp}</span>
         </div>
         {acted && (
           <div className="absolute inset-0 bg-black/20 flex items-center justify-center pointer-events-none">
-            <span className="text-white font-bold bg-black/50 px-1" style={{ fontSize:`${0.5*fs}rem` }}>済</span>
+            <span className="text-white font-bold bg-black/50" style={{ fontSize:"0.5em", padding:"0 0.2em" }}>済</span>
           </div>
         )}
       </div>
@@ -59,71 +54,48 @@ export function CardLayout({ card, image, extraBottom, dimmed = false, acted = f
   }
 
   return (
-    <div
-      className="relative flex flex-col bg-white overflow-hidden"
-      style={{
-        width:"100%", height:"100%",
-        borderRadius:`${3*fs}px`,
-        border: bs,
-        opacity: dimmed ? 0.45 : 1,
-      }}
-    >
-      {/* 上部: コスト（正方形30%）+ 名前（下枠なし・イラストとの間の線なし） */}
+    <div className="relative flex flex-col bg-white overflow-hidden"
+      style={{ width:"100%", height:"100%", border:bs, borderRadius:"0.15em", opacity:dimmed?0.45:1 }}>
+
+      {/* コスト + 名前 */}
       <div className="flex items-start flex-shrink-0">
-        <div
-          className="flex items-center justify-center flex-shrink-0"
-          style={{
-            width:`${COST_RATIO*100}%`,
-            aspectRatio:"1/1",
-            borderRight: bs,
-            borderBottom: bs,
-          }}
-        >
-          <span className="font-bold" style={{ fontSize:`${0.72*fs}rem` }}>{card.cost}</span>
+        <div className="flex items-center justify-center flex-shrink-0"
+          style={{ width:"30%", aspectRatio:"1/1", borderRight:bs, borderBottom:bs }}>
+          <span className="font-bold" style={{ fontSize:"0.72em" }}>{card.cost}</span>
         </div>
-        <div
-          className="flex items-center overflow-hidden flex-1"
-          style={{ aspectRatio:`${1/COST_RATIO}/1`, padding:`0 ${3*fs}px` }}
-        >
-          <FitText text={card.name} maxSize={0.52*fs} minSize={0.28*fs}/>
+        <div className="flex items-center overflow-hidden flex-1"
+          style={{ aspectRatio:"7/3", padding:"0 0.15em" }}>
+          <FitText text={card.name} maxEm={0.52} minEm={0.28}/>
         </div>
       </div>
 
-      {/* イラスト（上下の線なし） */}
+      {/* イラスト（上下線なし） */}
       <div className="relative flex-shrink-0" style={{ height:"40%" }}>
         {image
           ? <img src={image} alt={card.name} className="absolute inset-0 w-full h-full object-cover"/>
           : <div className="absolute inset-0 bg-gray-50 flex items-center justify-center">
-              <span className="text-gray-300" style={{ fontSize:`${0.4*fs}rem` }}>
+              <span className="text-gray-300" style={{ fontSize:"0.4em" }}>
                 {ATTR_LABELS[card.attr] || ""}
               </span>
             </div>
         }
       </div>
 
-      {/* 下部との境界線 */}
-      <div style={{ borderTop: bs, flexShrink:0 }}/>
+      {/* イラストと下部の境界線 */}
+      <div style={{ borderTop:bs, flexShrink:0 }}/>
 
       {/* 下部: ステータス + 効果 */}
       <div className="flex flex-col flex-1 overflow-hidden">
         {!isSpellMagic && (
-          <div
-            className="flex items-center justify-between flex-shrink-0"
-            style={{
-              fontSize:`${0.5*fs}rem`,
-              padding:`${1*fs}px ${3*fs}px`,
-              borderBottom:`${bw}px solid black`,
-            }}
-          >
+          <div className="flex items-center justify-between flex-shrink-0"
+            style={{ fontSize:"0.5em", padding:"0.05em 0.3em", borderBottom:bs }}>
             <span className="font-bold">{card.atk > 0 ? card.atk : "－"}</span>
-            <span style={{ fontSize:`${0.42*fs}rem` }}>{rangeText(card)}</span>
+            <span style={{ fontSize:"0.9em" }}>{rangeText(card)}</span>
             <span className="font-bold">{card.hp}</span>
           </div>
         )}
-        <div className="flex-1 overflow-hidden" style={{ padding:`${1*fs}px ${3*fs}px` }}>
-          <span className="text-black leading-tight" style={{ fontSize:`${0.38*fs}rem` }}>
-            {card.desc || ""}
-          </span>
+        <div className="flex-1 overflow-hidden" style={{ padding:"0.05em 0.3em" }}>
+          <span className="leading-tight" style={{ fontSize:"0.38em" }}>{card.desc || ""}</span>
         </div>
       </div>
 
@@ -131,27 +103,28 @@ export function CardLayout({ card, image, extraBottom, dimmed = false, acted = f
 
       {acted && (
         <div className="absolute inset-0 bg-black/20 flex items-center justify-center pointer-events-none">
-          <span className="text-white font-bold bg-black/50 px-1" style={{ fontSize:`${0.5*fs}rem` }}>済</span>
+          <span className="text-white font-bold bg-black/50" style={{ fontSize:"0.5em", padding:"0 0.2em" }}>済</span>
         </div>
       )}
     </div>
   );
 }
 
-// 手札（59×86固定）
+// 手札（59×86）- font-sizeで全体スケール制御
 export function CardFace({ card, image }) {
   return (
-    <div style={{ width:`${CARD_W}px`, height:`${CARD_H}px` }}>
-      <CardLayout card={card} image={image} cardW={CARD_W}/>
+    <div style={{ width:`${CARD_W}px`, height:`${CARD_H}px`, fontSize:`${CARD_W}px` }}>
+      <CardLayout card={card} image={image}/>
     </div>
   );
 }
 
-// 場のカード（59×86固定）
+// 場のカード（59×86）
 export function UnitCell({ unit, pushed }) {
   return (
     <div style={{
       width:`${CARD_W}px`, height:`${CARD_H}px`,
+      fontSize:`${CARD_W}px`,
       transition:"transform 0.15s",
       transform: pushed ? "translateY(5px)" : "none",
     }}>
@@ -159,35 +132,35 @@ export function UnitCell({ unit, pushed }) {
         card={{ ...unit, cost: unit.originalCost ?? unit.cost }}
         image={unit.image}
         acted={unit.acted}
-        cardW={CARD_W}
       />
     </div>
   );
 }
 
-// デッキ・図鑑（親要素のサイズに依存）
-export function CardGrid({ card, image, count, onInc, onDec, cardW = 70 }) {
-  const fs = cardW / CARD_W;
-  const bw = borderW(cardW);
-
+// デッキ・図鑑（親の幅に依存）
+export function CardGrid({ card, image, count, onInc, onDec }) {
   const extraBottom = onInc ? (
-    <div
-      className="flex items-center justify-between flex-shrink-0"
-      style={{ padding:`${1*fs}px ${2*fs}px`, borderTop:`${bw}px solid black` }}
-    >
+    <div className="flex items-center justify-between flex-shrink-0"
+      style={{ padding:"0.05em 0.1em", borderTop:"0.08em solid black" }}>
       <button onClick={onDec}
         className="border border-black font-bold flex items-center justify-center"
-        style={{ width:`${20*fs}px`, height:`${20*fs}px`, fontSize:`${0.7*fs}rem` }}>－</button>
-      <span className="font-mono font-bold" style={{ fontSize:`${0.55*fs}rem` }}>{count||0}</span>
+        style={{ width:"0.9em", height:"0.9em", fontSize:"0.7em" }}>－</button>
+      <span className="font-mono font-bold" style={{ fontSize:"0.55em" }}>{count||0}</span>
       <button onClick={onInc}
         className="border border-black font-bold flex items-center justify-center"
-        style={{ width:`${20*fs}px`, height:`${20*fs}px`, fontSize:`${0.7*fs}rem` }}>＋</button>
+        style={{ width:"0.9em", height:"0.9em", fontSize:"0.7em" }}>＋</button>
     </div>
   ) : null;
 
+  // CardGridは親の幅をfont-sizeとして使う
+  // aspect-ratio で高さが決まるので、widthをfont-sizeに使う
   return (
-    <div style={{ width:"100%", aspectRatio:`${CARD_W}/${CARD_H}` }}>
-      <CardLayout card={card} image={image} extraBottom={extraBottom} cardW={cardW}/>
+    <div style={{ width:"100%", aspectRatio:`${CARD_W}/${CARD_H}` }}
+      className="relative">
+      {/* font-sizeを親幅に連動させるためのラッパー */}
+      <div style={{ position:"absolute", inset:0, fontSize:"inherit" }}>
+        <CardLayout card={card} image={image} extraBottom={extraBottom}/>
+      </div>
     </div>
   );
 }
