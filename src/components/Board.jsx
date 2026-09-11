@@ -1,4 +1,4 @@
-import { UnitCell } from './CardParts.jsx';
+import { UnitCell } from './CardDesign.jsx';
 import { rowToCoord, getAttackTargets, getMovable } from '../engine/battle.js';
 
 const CELL = 90; // マスサイズ
