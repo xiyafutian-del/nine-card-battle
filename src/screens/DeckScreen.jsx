@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ATTRS, ATTR_LABELS, GENERATOR_INFO, TYPES, RANGE_TYPE } from '../constants/index.js';
-import { CardGrid } from '../components/CardParts.jsx';
+import { CardGrid } from '../components/CardDesign.jsx';
 
 const EMPTY_DECK = { name: "", counts: {}, generator: "water" };
 
