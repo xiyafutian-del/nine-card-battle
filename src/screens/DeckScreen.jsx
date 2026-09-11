@@ -160,19 +160,24 @@ export function DeckScreen({ cardPool, cardImages, onBack, activeDeck, onActiveD
           </div>
         </div>
 
-        {/* カードグリッド（横3枚） */}
-        <div className="grid gap-2" style={{gridTemplateColumns:"repeat(3,1fr)"}}>
-          {filtered.map(c => (
-            <CardGrid
-              key={c.id}
-              card={c}
-              image={cardImages?.[c.id] || c.image}
-              count={editing.counts?.[c.id] || 0}
-              onInc={() => incCount(c.id)}
-              onDec={() => decCount(c.id)}
-            />
-          ))}
-        </div>
+{/* カードグリッド（横3枚）*/}
+<div className="grid gap-2" style={{gridTemplateColumns:"repeat(3,1fr)"}}>
+  {filtered.map(c => {
+    // グリッド1枠の幅を計算（画面幅-padding) / 3
+    const gridW = Math.floor((Math.min(window.innerWidth, 384) - 24) / 3);
+    return (
+      <div key={c.id} style={{ fontSize:`${gridW}px` }}>
+        <CardGrid
+          card={c}
+          image={cardImages?.[c.id] || c.image}
+          count={editing.counts?.[c.id] || 0}
+          onInc={() => incCount(c.id)}
+          onDec={() => decCount(c.id)}
+        />
+      </div>
+    );
+  })}
+</div>
         <div className="h-8"/>
       </div>
     </div>
