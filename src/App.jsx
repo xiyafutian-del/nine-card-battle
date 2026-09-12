@@ -13,9 +13,7 @@ import { getGeneratorCost } from './constants/index.js';
 
 function buildInitialBattleState(cardPool, deckCounts, playerGenerator) {
   const pDeck = buildDeck(cardPool, deckCounts);
-  const aiCounts = {};
-  cardPool.forEach(c => (aiCounts[c.id] = 2));
-  const rDeck = buildDeck(cardPool, aiCounts);
+  const rDeck = buildDeck(cardPool, deckCounts);
   const pHand = pDeck.splice(0, 4);
   const rHand = rDeck.splice(0, 4);
   const board = { blue: [[], [], []], red: [[], [], []] };
