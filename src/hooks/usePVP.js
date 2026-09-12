@@ -98,3 +98,28 @@ async function joinRoom(id, guestDeck, guestHand) {
     aiGrave: [],
   };
 }
+async function pushState(state) {
+    if (!roomId) return;
+    await supabase.from("rooms").update({
+      state,
+      updated_by: roleRef.current,
+      updated_at: new Date().toISOString(),
+    }).eq("id", roomId);
+  }
+
+  function leaveRoom() {
+    if (channelRef.current) channelRef.current.unsubscribe();
+    setRoomId(""); setPvpRole(null); roleRef.current = null;
+    setPvpStatus("idle"); setError("");
+  }
+
+  useEffect(() => {
+    return () => { if (channelRef.current) channelRef.current.unsubscribe(); };
+  }, []);
+
+  return {
+    roomId, inputRoomId, setInputRoomId,
+    pvpRole, pvpStatus, error,
+    createRoom, joinRoom, pushState, leaveRoom,
+  };
+}
