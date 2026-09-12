@@ -60,3 +60,41 @@ export function usePVP(onStateUpdate) {
     return id;
   }
 
+async function joinRoom(id, guestDeck, guestHand) {
+  setError("");
+  const { data, error: err } = await supabase
+    .from("rooms").select("*").eq("id", id.toUpperCase()).single();
+  if (err || !data) { setError("部屋が見つかりません"); return null; }
+  if (data.status !== "waiting") { setError("この部屋はすでに満員です"); return null; }
+
+  const { error: err2 } = await supabase
+    .from("rooms").update({
+      guest_id: "guest",
+      status: "ready",
+      updated_by: "guest",
+      // 参加者のデッキ情報をSupabaseに保存
+      state: {
+        ...data.state,
+        aiDeck: guestDeck,
+        aiHand: guestHand,
+        aiCost: 0,
+        aiGrave: [],
+      },
+    }).eq("id", id.toUpperCase());
+  if (err2) { setError("入室に失敗しました"); return null; }
+
+  setRoomId(id.toUpperCase());
+  setPvpRole("guest");
+  roleRef.current = "guest";
+  setPvpStatus("playing");
+  subscribeToRoom(id.toUpperCase(), "guest");
+
+  // 更新後のstateを返す
+  return {
+    ...data.state,
+    aiDeck: guestDeck,
+    aiHand: guestHand,
+    aiCost: 0,
+    aiGrave: [],
+  };
+}
