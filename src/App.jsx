@@ -122,13 +122,27 @@ export default function App() {
     if (id) setBattle(initialState);
   }
 
-  async function handleJoinRoom(id) {
-    const state = await joinRoom(id);
-    if (state) {
-      setBattle({ ...state, firstPlayer: "blue", selectedUnit: null, selectedSpell: null });
-      setScreen("battle");
-    }
+async function handleJoinRoom(id) {
+  const state = await joinRoom(id);
+  if (state) {
+    // 参加者は自分のデッキで盤面を再構築
+    const myState = buildInitialBattleState(cardPool, deckCounts, playerGenerator);
+    // ホストの盤面はそのまま使い、自分の手札・デッキだけ上書き
+    setBattle({
+      ...state,
+      // 参加者(red)の情報を自分のデッキで上書き
+      aiDeck: myState.playerDeck,
+      aiHand: myState.playerHand,
+      aiCost: 0,
+      aiGrave: [],
+      aiGenerator: playerGenerator,
+      firstPlayer: "blue",
+      selectedUnit: null,
+      selectedSpell: null,
+    });
+    setScreen("battle");
   }
+}
 
   function handleRequestBack() {
     if (battle?.mode === "pvp") leaveRoom();
