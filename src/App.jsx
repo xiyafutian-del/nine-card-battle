@@ -121,18 +121,14 @@ export default function App() {
   }
 
 async function handleJoinRoom(id) {
-  const state = await joinRoom(id);
+  // 参加者のデッキを事前に構築
+  const myDeck = buildDeck(cardPool, deckCounts);
+  const myHand = myDeck.splice(0, 4);
+
+  const state = await joinRoom(id, myDeck, myHand);
   if (state) {
-    // 参加者は自分のデッキで盤面を再構築
-    const myState = buildInitialBattleState(cardPool, deckCounts, playerGenerator);
-    // ホストの盤面はそのまま使い、自分の手札・デッキだけ上書き
     setBattle({
       ...state,
-      // 参加者(red)の情報を自分のデッキで上書き
-      aiDeck: myState.playerDeck,
-      aiHand: myState.playerHand,
-      aiCost: 0,
-      aiGrave: [],
       aiGenerator: playerGenerator,
       firstPlayer: "blue",
       selectedUnit: null,
