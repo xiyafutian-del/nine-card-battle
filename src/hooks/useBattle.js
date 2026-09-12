@@ -58,6 +58,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction) {
   }, [battle?.active, battle?.turn]);
 
   function startBattle(mode) {
+　　setConfirmLeave(false);
     setBattle(initBattle(mode, cardPool, deckCounts, playerGenerator));
   }
 
