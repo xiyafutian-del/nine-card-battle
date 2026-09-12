@@ -9,9 +9,7 @@ import { runAITurn } from '../engine/ai.js';
 
 function initBattle(mode, cardPool, deckCounts, playerGenerator) {
   const pDeck = buildDeck(cardPool, deckCounts);
-  const aiCounts = {};
-  cardPool.forEach(c => (aiCounts[c.id] = 2));
-  const rDeck = buildDeck(cardPool, mode === "solo" ? deckCounts : aiCounts);
+  const rDeck = buildDeck(cardPool, deckCounts); // AIも同じデッキを使う
   const pHand = pDeck.splice(0, 4);
   const rHand = rDeck.splice(0, 4);
   const board = { blue: [[], [], []], red: [[], [], []] };
