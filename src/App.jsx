@@ -52,11 +52,7 @@ export default function App() {
   const [activeDeck, setActiveDeck] = useState(() => loadActiveDeck());
 
   // デッキからdeckCounts/playerGeneratorを導出
-  const deckCounts = activeDeck?.counts || (() => {
-    const o = {};
-    INITIAL_CARDS.forEach(c => (o[c.id] = 2));
-    return o;
-  })();
+  const deckCounts = activeDeck?.counts || { 1: 30 }; // ソルジャー(id:1)30枚
   const playerGenerator = activeDeck?.generator || "water";
   const deckTotal = Object.values(deckCounts).reduce((a, b) => a + b, 0);
 
