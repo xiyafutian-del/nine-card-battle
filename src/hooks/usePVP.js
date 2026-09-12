@@ -113,7 +113,23 @@ async function pushState(state) {
     setPvpStatus("idle"); setError("");
   }
 
-  useEffect(() => {
+  // タブがアクティブに戻ったら最新状態を取得
+useEffect(() => {
+  async function handleVisibilityChange() {
+    if (document.visibilityState === "visible" && roomId) {
+      const { data } = await supabase
+        .from("rooms")
+        .select("state, updated_by")
+        .eq("id", roomId)
+        .single();
+      if (data?.state && data.updated_by !== roleRef.current) {
+        onStateUpdate(data.state, "playing");
+      }
+    }
+  }
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+}, [roomId]);
     return () => { if (channelRef.current) channelRef.current.unsubscribe(); };
   }, []);
 
