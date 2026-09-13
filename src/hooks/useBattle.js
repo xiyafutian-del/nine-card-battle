@@ -186,6 +186,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction) {
       // 新規選択
       if (side === active && !turn1block) {
         const u = prev.board[side][col][idx];
+         if (u && !u.acted && !u.stunned) return { ...prev, selectedUnit: { col, idx } }; // ← stunned追加
         if (u && !u.acted) return { ...prev, selectedUnit: { col, idx } };
       }
       return prev;
