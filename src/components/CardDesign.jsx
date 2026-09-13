@@ -96,7 +96,21 @@ export function CardLayout({ card, image, extraBottom, dimmed=false, acted=false
           <span className="leading-tight" style={{ fontSize:`${5*scale}px` }}>{card.desc||""}</span>
         </div>
       </div>
-
+      
+{/* tagsバッジ */}
+{card.tags?.length > 0 && (
+  <div className="flex flex-wrap gap-0.5 flex-shrink-0" style={{ padding:`${1*scale}px ${3*scale}px` }}>
+    {card.tags.map((t, i) => (
+      <span key={i} style={{
+        fontSize:`${5*scale}px`,
+        border:`${Math.max(0.5, scale*0.8)}px solid black`,
+        padding:`0 ${2*scale}px`,
+        lineHeight:1.3,
+      }}>({t})</span>
+    ))}
+  </div>
+)}
+      
       {extraBottom}
 
       {acted && (
