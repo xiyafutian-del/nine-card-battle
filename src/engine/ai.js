@@ -39,7 +39,7 @@ export function runAITurn(state) {
   outer: for (let c = 0; c < 3; c++) {
     for (let idx = 0; idx < board.red[c].length; idx++) {
       const unit = board.red[c][idx];
-      if (!unit || unit.atk <= 0 || unit.acted) continue;
+      if (!unit || unit.atk <= 0 || unit.acted|| unit.stunned) continue;
       const valid = getAttackTargets("red", c, idx, unit, board);
       if (valid.length === 0) continue;
 
