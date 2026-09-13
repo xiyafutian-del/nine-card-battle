@@ -210,7 +210,16 @@ export function attackUnit(state, side, atkCol, atkIdx, defCol, defIdx) {
   const bonus = calcForgeBonus(side, atkCol, atkIdx, board);
   const dmg = attacker.atk + bonus;
   defender.hp -= dmg;
+  attacker.actCount = (attacker.actCount || 0) + 1;
+const has2act = attacker.tags?.includes("2回行動");
+const hasRecoil = attacker.tags?.includes("反動");
+if (has2act && attacker.actCount < 2) {
+  // 1回目はまだ行動可能
+} else {
   attacker.acted = true;
+  const baseDeg = hasRecoil ? 180 : 90;
+  attacker.rotateDeg = (attacker.rotateDeg || 0) - baseDeg;
+}
   log.push(`${attacker.name}→${defender.name}に${dmg}ダメージ`);
 
   // 機械属リンク
