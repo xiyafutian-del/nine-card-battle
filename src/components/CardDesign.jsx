@@ -1,12 +1,13 @@
 import { ATTR_LABELS, TYPES } from '../constants/index.js';
+import { useRef, useEffect, useState } from 'react';
 
 export const CARD_W = 59;
 export const CARD_H = 86;
 
 export function rangeText(card) {
   if (!card) return "";
-  if (card.rangeType === "diamond") return `◇${card.dRange || 1}`;
-  return `□${card.hRange || 1}×${card.vRange || 1}`;
+  if (card.rangeType === "diamond") return `d${card.dRange || 1}`;
+  return `${card.hRange || 1}.${card.vRange || 1}`;
 }
 
 function FitText({ text, base, min }) {
@@ -18,15 +19,14 @@ function FitText({ text, base, min }) {
   return <span style={{ fontSize:`${size}px`, lineHeight:1.1 }}>{text}</span>;
 }
 
-// カードの共通レイアウト。w/hはpxで渡す
 export function CardLayout({ card, image, extraBottom, dimmed=false, acted=false, w=CARD_W, h=CARD_H }) {
   const isSpellMagic = card.type === TYPES.SPELL || card.type === TYPES.MAGIC;
   const isCore = card.isCore || card.id === "core";
 
-  const scale = w / CARD_W;           // スケール係数
-  const bw = Math.max(1, scale * 1.5);// ボーダー幅px
+  const scale = w / CARD_W;
+  const bw = Math.max(0.5, scale * 1.5);
   const bs = `${bw}px solid black`;
-  const r  = `${3 * scale}px`;        // 角丸px
+  const r  = `${3 * scale}px`;
 
   if (isCore) {
     return (
@@ -48,27 +48,35 @@ export function CardLayout({ card, image, extraBottom, dimmed=false, acted=false
     );
   }
 
-  const costW = Math.round(w * 0.30); // コストボックス幅
-  const nameH = costW;                // 名前行の高さ = コストボックスと同じ
+  // コスト・名前エリアの高さ（0.7倍）
+  const costW = Math.round(w * 0.30 * 0.7);
+  const nameH = Math.round(w * 0.30 * 0.7);
+
+  // イラストエリアの高さ
+  const statsH = Math.round(h * 0.13);
+  const tagsH  = (card.tags?.length > 0) ? Math.round(h * 0.10) : 0;
+  const topH   = nameH;
+  const illH   = Math.round(h * 0.36);
+  const descH  = h - topH - illH - statsH - tagsH;
 
   return (
     <div className="relative flex flex-col bg-white overflow-hidden"
       style={{ width:`${w}px`, height:`${h}px`, border:bs, borderRadius:r, opacity:dimmed?0.45:1 }}>
 
-      {/* コスト + 名前 */}
+      {/* コスト + 名前（0.7倍サイズ） */}
       <div className="flex items-stretch flex-shrink-0" style={{ height:`${nameH}px` }}>
         <div className="flex items-center justify-center flex-shrink-0"
           style={{ width:`${costW}px`, borderRight:bs, borderBottom:bs }}>
-          <span className="font-bold" style={{ fontSize:`${9*scale}px` }}>{card.cost}</span>
+          <span className="font-bold" style={{ fontSize:`${9*scale*0.7}px` }}>{card.cost}</span>
         </div>
         <div className="flex items-center overflow-hidden flex-1"
           style={{ padding:`0 ${2*scale}px` }}>
-          <FitText text={card.name} base={6.5*scale} min={3.5*scale}/>
+          <FitText text={card.name} base={6.5*scale*0.7} min={3.5*scale*0.7}/>
         </div>
       </div>
 
       {/* イラスト（上下線なし） */}
-      <div className="relative flex-shrink-0" style={{ height:`${Math.round(h*0.40)}px` }}>
+      <div className="relative flex-shrink-0" style={{ height:`${illH}px` }}>
         {image
           ? <img src={image} alt={card.name} className="absolute inset-0 w-full h-full object-cover"/>
           : <div className="absolute inset-0 bg-gray-50 flex items-center justify-center">
@@ -82,35 +90,32 @@ export function CardLayout({ card, image, extraBottom, dimmed=false, acted=false
       {/* 境界線 */}
       <div style={{ borderTop:bs, flexShrink:0 }}/>
 
-      {/* 下部: ステータス + 効果 */}
-      <div className="flex flex-col flex-1 overflow-hidden">
-        {!isSpellMagic && (
-          <div className="flex items-center justify-between flex-shrink-0"
-            style={{ padding:`${1*scale}px ${3*scale}px`, borderBottom:bs }}>
-            <span className="font-bold" style={{ fontSize:`${6*scale}px` }}>{card.atk > 0 ? card.atk : "－"}</span>
-            <span style={{ fontSize:`${5*scale}px` }}>{rangeText(card)}</span>
-            <span className="font-bold" style={{ fontSize:`${6*scale}px` }}>{card.hp}</span>
-          </div>
-        )}
-        <div className="flex-1 overflow-hidden" style={{ padding:`${1*scale}px ${3*scale}px` }}>
-          <span className="leading-tight" style={{ fontSize:`${5*scale}px` }}>{card.desc||""}</span>
+      {/* ATK・射程・HP */}
+      {!isSpellMagic && (
+        <div className="flex items-center justify-between flex-shrink-0"
+          style={{ height:`${statsH}px`, padding:`0 ${3*scale}px`, borderBottom:bs }}>
+          <span className="font-bold" style={{ fontSize:`${6*scale}px` }}>{card.atk > 0 ? card.atk : "－"}</span>
+          <span style={{ fontSize:`${5*scale}px` }}>{rangeText(card)}</span>
+          <span className="font-bold" style={{ fontSize:`${6*scale}px` }}>{card.hp}</span>
         </div>
+      )}
+
+      {/* tagsバッジ（枠なし） */}
+      {card.tags?.length > 0 && (
+        <div className="flex flex-wrap flex-shrink-0"
+          style={{ height:`${tagsH}px`, padding:`0 ${3*scale}px`, alignItems:"center", gap:`${1*scale}px` }}>
+          {card.tags.map((t, i) => (
+            <span key={i} style={{ fontSize:`${5*scale}px`, lineHeight:1.2 }}>({t})</span>
+          ))}
+        </div>
+      )}
+
+      {/* 効果テキスト */}
+      <div className="flex-1 overflow-hidden" style={{ padding:`${1*scale}px ${3*scale}px` }}>
+        <span className="leading-tight" style={{ fontSize:`${5*scale}px` }}>{card.desc || ""}</span>
       </div>
-      
-{/* tagsバッジ */}
-{card.tags?.length > 0 && (
-  <div className="flex flex-wrap gap-0.5 flex-shrink-0" style={{ padding:`${1*scale}px ${3*scale}px` }}>
-    {card.tags.map((t, i) => (
-      <span key={i} style={{
-        fontSize:`${5*scale}px`,
-        border:`${Math.max(0.5, scale*0.8)}px solid black`,
-        padding:`0 ${2*scale}px`,
-        lineHeight:1.3,
-      }}>({t})</span>
-    ))}
-  </div>
-)}
-      
+
+      {/* 追加UI（デッキ枚数カウンター）*/}
       {extraBottom}
 
       {acted && (
@@ -122,20 +127,24 @@ export function CardLayout({ card, image, extraBottom, dimmed=false, acted=false
   );
 }
 
-// 手札（59×86固定）
 export function CardFace({ card, image }) {
   return <CardLayout card={card} image={image} w={CARD_W} h={CARD_H}/>;
 }
 
-// 場のカード（59×86固定）
 export function UnitCell({ unit, pushed }) {
   return (
     <div style={{
+      width:`${CARD_W}px`, height:`${CARD_H}px`,
       transition:"transform 0.15s",
       transform: pushed ? "translateY(5px)" : "none",
     }}>
       <CardLayout
-        card={{ ...unit, cost: unit.originalCost ?? unit.cost }}
+        card={{
+          ...unit,
+          cost: unit.originalCost ?? unit.cost,
+          tags: unit.tags || [],
+          desc: unit.desc || "",
+        }}
         image={unit.image}
         acted={unit.acted}
         w={CARD_W} h={CARD_H}
@@ -143,9 +152,6 @@ export function UnitCell({ unit, pushed }) {
     </div>
   );
 }
-
-// デッキ・図鑑（親コンテナのrefから実幅を取得）
-import { useRef, useEffect, useState } from 'react';
 
 export function CardGrid({ card, image, count, onInc, onDec }) {
   const ref = useRef(null);
@@ -162,7 +168,7 @@ export function CardGrid({ card, image, count, onInc, onDec }) {
 
   const h = Math.round(w * CARD_H / CARD_W);
   const scale = w / CARD_W;
-  const bw = Math.max(1, scale * 1.5);
+  const bw = Math.max(0.5, scale * 1.5);
   const bs = `${bw}px solid black`;
 
   const extraBottom = onInc ? (
