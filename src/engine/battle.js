@@ -72,6 +72,7 @@ export function getDiamondTargets(side, col, idx, dRange, board) {
 }
 
 export function getAttackTargets(side, col, idx, unit, board) {
+  if (!unit || unit.atk <= 0) return []; // ← 追加
   if (unit.rangeType === "diamond")
     return getDiamondTargets(side, col, idx, unit.dRange || 1, board);
   return getValidTargets(side, col, idx, unit.hRange, unit.vRange, board);
