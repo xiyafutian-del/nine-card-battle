@@ -250,6 +250,8 @@ export function makeUnitFromCard(card) {
     isFacility: card.type === "facility",
     acted: false,
       cost: card.cost,
+    tags: card.tags || [],        // ← 追加
+    desc: card.desc || "",        // ← 追加
     originalCost: card.cost,  // ← 追加（召喚後も元コストを保持）
     summonedTurn: null,
     image: card.image || null,
