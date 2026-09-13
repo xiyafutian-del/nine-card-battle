@@ -255,6 +255,9 @@ export function makeUnitFromCard(card) {
     originalCost: card.cost,  // ← 追加（召喚後も元コストを保持）
     summonedTurn: null,
     image: card.image || null,
+    rotateDeg: 0,        // 現在の回転角度
+actCount: 0,         // 行動回数（2回行動用）
+stunned: false,      // スタン状態
     _k: card._k || nextKey(),
   };
 }
