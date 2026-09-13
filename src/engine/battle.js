@@ -136,6 +136,15 @@ export function applyTurnStart(state, side, generatorType) {
   // ドロー
   if (deck.length > 0 && hand.length < 10) hand.push(deck.shift());
 
+  //アンタップ
+board[side].forEach(col => col.forEach(u => {
+  if (u) {
+    u.rotateDeg = Math.min(0, (u.rotateDeg || 0) + 90);
+    u.actCount = 0;
+    u.stunned = false;
+  }
+}));
+  
   // 発電機コスト
   const gained = getGeneratorCost(generatorType || "water", state.turn);
   cost += gained;
