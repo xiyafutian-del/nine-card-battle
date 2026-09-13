@@ -16,10 +16,17 @@ function FitText({ text, base, min }) {
              : len <= 9  ? base * 0.85
              : len <= 12 ? base * 0.72
              : min;
-  return <span style={{ fontSize:`${size}px`, lineHeight:1.1 }}>{text}</span>;
+  return <span style={{ fontSize:`${size}px`, lineHeight:1.0 }}>{text}</span>;
 }
 
-export function CardLayout({ card, image, extraBottom, dimmed=false, acted=false, w=CARD_W, h=CARD_H }) {
+// 回転角度を計算
+function getRotation(unit) {
+  if (!unit) return 0;
+  const deg = unit.rotateDeg || 0;
+  return deg;
+}
+
+export function CardLayout({ card, image, extraBottom, dimmed=false, w=CARD_W, h=CARD_H, rotateDeg=0 }) {
   const isSpellMagic = card.type === TYPES.SPELL || card.type === TYPES.MAGIC;
   const isCore = card.isCore || card.id === "core";
 
@@ -31,7 +38,8 @@ export function CardLayout({ card, image, extraBottom, dimmed=false, acted=false
   if (isCore) {
     return (
       <div className="relative flex flex-col bg-white overflow-hidden"
-        style={{ width:`${w}px`, height:`${h}px`, border:bs, borderRadius:r }}>
+        style={{ width:`${w}px`, height:`${h}px`, border:bs, borderRadius:r,
+          transform:`rotate(${rotateDeg}deg)`, transformOrigin:"center center" }}>
         <div className="flex items-center justify-center flex-shrink-0"
           style={{ height:"30%", borderBottom:bs }}>
           <span className="font-bold" style={{ fontSize:`${7*scale}px` }}>コア</span>
@@ -39,31 +47,27 @@ export function CardLayout({ card, image, extraBottom, dimmed=false, acted=false
         <div className="flex-1 flex items-center justify-center">
           <span className="font-bold" style={{ fontSize:`${18*scale}px` }}>{card.hp}</span>
         </div>
-        {acted && (
-          <div className="absolute inset-0 bg-black/20 flex items-center justify-center pointer-events-none">
-            <span className="text-white font-bold bg-black/50" style={{ fontSize:`${6*scale}px`, padding:`0 ${2*scale}px` }}>済</span>
-          </div>
-        )}
       </div>
     );
   }
 
-  // コスト・名前エリアの高さ（0.7倍）
   const costW = Math.round(w * 0.30 * 0.7);
   const nameH = Math.round(w * 0.30 * 0.7);
-
-  // イラストエリアの高さ
+  const illH  = Math.round(h * 0.36);
   const statsH = Math.round(h * 0.13);
-  const tagsH  = (card.tags?.length > 0) ? Math.round(h * 0.10) : 0;
-  const topH   = nameH;
-  const illH   = Math.round(h * 0.36);
-  const descH  = h - topH - illH - statsH - tagsH;
+  const hasTags = card.tags?.length > 0;
+  const tagsH  = hasTags ? Math.round(h * 0.10) : 0;
 
   return (
     <div className="relative flex flex-col bg-white overflow-hidden"
-      style={{ width:`${w}px`, height:`${h}px`, border:bs, borderRadius:r, opacity:dimmed?0.45:1 }}>
+      style={{
+        width:`${w}px`, height:`${h}px`, border:bs, borderRadius:r,
+        opacity: dimmed ? 0.45 : 1,
+        transform:`rotate(${rotateDeg}deg)`,
+        transformOrigin:"center center",
+      }}>
 
-      {/* コスト + 名前（0.7倍サイズ） */}
+      {/* コスト + 名前 */}
       <div className="flex items-stretch flex-shrink-0" style={{ height:`${nameH}px` }}>
         <div className="flex items-center justify-center flex-shrink-0"
           style={{ width:`${costW}px`, borderRight:bs, borderBottom:bs }}>
@@ -75,7 +79,7 @@ export function CardLayout({ card, image, extraBottom, dimmed=false, acted=false
         </div>
       </div>
 
-      {/* イラスト（上下線なし） */}
+      {/* イラスト */}
       <div className="relative flex-shrink-0" style={{ height:`${illH}px` }}>
         {image
           ? <img src={image} alt={card.name} className="absolute inset-0 w-full h-full object-cover"/>
@@ -101,28 +105,23 @@ export function CardLayout({ card, image, extraBottom, dimmed=false, acted=false
       )}
 
       {/* tagsバッジ（枠なし） */}
-      {card.tags?.length > 0 && (
+      {hasTags && (
         <div className="flex flex-wrap flex-shrink-0"
-          style={{ height:`${tagsH}px`, padding:`0 ${3*scale}px`, alignItems:"center", gap:`${1*scale}px` }}>
+          style={{ height:`${tagsH}px`, padding:`0 ${3*scale}px`, alignItems:"center", gap:`${scale}px` }}>
           {card.tags.map((t, i) => (
-            <span key={i} style={{ fontSize:`${5*scale}px`, lineHeight:1.2 }}>({t})</span>
+            <span key={i} style={{ fontSize:`${5*scale}px`, lineHeight:1.0 }}>({t})</span>
           ))}
         </div>
       )}
 
-      {/* 効果テキスト */}
-      <div className="flex-1 overflow-hidden" style={{ padding:`${1*scale}px ${3*scale}px` }}>
-        <span className="leading-tight" style={{ fontSize:`${5*scale}px` }}>{card.desc || ""}</span>
+      {/* 効果テキスト（上詰め・行間小さめ） */}
+      <div className="overflow-hidden" style={{ padding:`${1*scale}px ${3*scale}px`, flex:"1 1 0" }}>
+        <span style={{ fontSize:`${4.8*scale}px`, lineHeight:1.15, display:"block" }}>
+          {card.desc || ""}
+        </span>
       </div>
 
-      {/* 追加UI（デッキ枚数カウンター）*/}
       {extraBottom}
-
-      {acted && (
-        <div className="absolute inset-0 bg-black/20 flex items-center justify-center pointer-events-none">
-          <span className="text-white font-bold bg-black/50" style={{ fontSize:`${6*scale}px`, padding:`0 ${2*scale}px` }}>済</span>
-        </div>
-      )}
     </div>
   );
 }
@@ -132,11 +131,13 @@ export function CardFace({ card, image }) {
 }
 
 export function UnitCell({ unit, pushed }) {
+  const deg = unit.rotateDeg || 0;
   return (
     <div style={{
       width:`${CARD_W}px`, height:`${CARD_H}px`,
-      transition:"transform 0.15s",
+      transition:"transform 0.3s",
       transform: pushed ? "translateY(5px)" : "none",
+      display:"flex", alignItems:"center", justifyContent:"center",
     }}>
       <CardLayout
         card={{
@@ -146,8 +147,8 @@ export function UnitCell({ unit, pushed }) {
           desc: unit.desc || "",
         }}
         image={unit.image}
-        acted={unit.acted}
         w={CARD_W} h={CARD_H}
+        rotateDeg={deg}
       />
     </div>
   );
@@ -171,22 +172,23 @@ export function CardGrid({ card, image, count, onInc, onDec }) {
   const bw = Math.max(0.5, scale * 1.5);
   const bs = `${bw}px solid black`;
 
-  const extraBottom = onInc ? (
-    <div className="flex items-center justify-between flex-shrink-0"
-      style={{ padding:`${1*scale}px ${2*scale}px`, borderTop:bs }}>
-      <button onClick={onDec}
-        className="border border-black font-bold flex items-center justify-center"
-        style={{ width:`${16*scale}px`, height:`${16*scale}px`, fontSize:`${8*scale}px` }}>－</button>
-      <span className="font-mono font-bold" style={{ fontSize:`${7*scale}px` }}>{count||0}</span>
-      <button onClick={onInc}
-        className="border border-black font-bold flex items-center justify-center"
-        style={{ width:`${16*scale}px`, height:`${16*scale}px`, fontSize:`${8*scale}px` }}>＋</button>
-    </div>
-  ) : null;
-
   return (
     <div ref={ref} style={{ width:"100%" }}>
-      <CardLayout card={card} image={image} extraBottom={extraBottom} w={w} h={h}/>
+      {/* カード本体 */}
+      <CardLayout card={card} image={image} w={w} h={h}/>
+      {/* ＋－はカードの外・下に表示 */}
+      {onInc && (
+        <div className="flex items-center justify-between"
+          style={{ padding:`${2*scale}px ${2*scale}px`, borderTop:"none" }}>
+          <button onClick={onDec}
+            className="border border-black font-bold flex items-center justify-center bg-white"
+            style={{ width:`${16*scale}px`, height:`${16*scale}px`, fontSize:`${8*scale}px` }}>－</button>
+          <span className="font-mono font-bold" style={{ fontSize:`${7*scale}px` }}>{count||0}</span>
+          <button onClick={onInc}
+            className="border border-black font-bold flex items-center justify-center bg-white"
+            style={{ width:`${16*scale}px`, height:`${16*scale}px`, fontSize:`${8*scale}px` }}>＋</button>
+        </div>
+      )}
     </div>
   );
 }
