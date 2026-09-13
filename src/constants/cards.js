@@ -187,4 +187,8 @@ export const INITIAL_CARDS = [
   card(58, "大自然の循環", 6, 0, 0, "1.1", "magic", "grass",
     { effect:{ trigger:"activate", target:"grave", action:"recycle", filter:{ attr:"grass" } },
       desc:"墓地の草属性を全てデッキに戻す" }),
+
+  card(59, "咆哮", 3, 0, 0, "1.1", "spell", "none",
+  { effect:{ trigger:"activate", target:"all_enemy_front", action:"stun" },
+    desc:"相手前列全体をスタン（行動不可）" }),
 ];
