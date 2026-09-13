@@ -48,6 +48,17 @@ export function resolveTargets(target, ctx) {
     case "enemy_front_col":   return board[enem][col]?.[0] ? [{ side: enem, col, idx: 0 }] : [];
     case "hand":              return hand ? [{ hand: true }] : [];
     case "grave":             return [{ grave: true }];
+    case "stun":
+  targets.forEach(t => {
+    const u = s.board[t.side][t.col][t.idx];
+    if (u) {
+      u.acted = true;
+      u.stunned = true;
+      u.rotateDeg = -90;
+      log.push(`${u.name}がスタンした`);
+    }
+  });
+  break;
     default:                  return [];
   }
 }
