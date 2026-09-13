@@ -178,7 +178,8 @@ export function summonUnit(state, side, handIndex, col, insertIdx) {
   const unit = makeUnitFromCard(card);
   unit.summonedTurn = state.turn;
 
-  board[side][col].splice(insertIdx, 0, unit);
+  if (board[side][col].length >= 3) return state; // ← 追加
+board[side][col].splice(Math.min(insertIdx, board[side][col].length), 0, unit);
   hand.splice(handIndex, 1);
   log.push(`${card.name}を召喚`);
 
