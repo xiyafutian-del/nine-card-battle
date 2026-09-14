@@ -12,6 +12,7 @@ export function Board({
   mode, turn, firstPlayer,
   draggingCard, onCellClick, onDragOver, onDrop, onDragLeave,
   dropPreview, playerGrave, aiGrave, playerDeck, aiDeck,
+  selectedGrowth,
   flipped = false,
 }) {
   const enem = active === "blue" ? "red" : "blue";
@@ -60,9 +61,15 @@ export function Board({
       if (i >= dropPreview.insertIdx && u) pushedUnits.add(u.uid);
     });
   }
-
+  
+// 成長カードのセルをハイライト
+const growthSelSet = new Set();
+if (selectedGrowth) {
+  growthSelSet.add(`${active}-${selectedGrowth.col}-${selectedGrowth.idx}`);
+}
   const rowOrder = flipped ? [5,4,3,2,1,0] : [0,1,2,3,4,5];
 
+  
   return (
     <div className="flex gap-1 mx-auto flex-shrink-0" style={{width:"fit-content"}}>
       {/* 盤面 */}
@@ -105,13 +112,15 @@ export function Board({
               const isGrowth = growthSet.has(unitKey);
               const isInsert = dropPreview && side===active && col===dropPreview.col && idx===dropPreview.insertIdx;
               const isPushed = unit && pushedUnits.has(unit.uid);
-
+              const isGrowthSel = growthSelSet.has(unitKey);
+              
               let bgColor = "transparent";
               if (isSel)         bgColor = "rgba(0,0,0,0.08)";
               else if (isAtk)    bgColor = "rgba(255,100,0,0.15)";
               else if (isMov)    bgColor = "rgba(0,180,0,0.12)";
               else if (isDrop)   bgColor = "rgba(100,0,200,0.08)";
               else if (isGrowth) bgColor = "rgba(0,160,0,0.08)";
+              else if (isGrowthSel) bgColor = "rgba(0,160,0,0.15)";
 
               const canTap = !gameOver && !(mode==="pve"&&active==="red") && side===active && unit && !unit.acted && !turn1block;
 
