@@ -187,6 +187,13 @@ export function summonUnit(state, side, handIndex, col, insertIdx) {
   const unit = makeUnitFromCard(card);
   unit.summonedTurn = state.turn;
 
+  unit.summonedTurn = state.turn;
+// 先制タグがなければ召喚時に反時計90度回転（行動済み扱い）
+if (!unit.tags?.includes("先制")) {
+  unit.rotateDeg = -90;
+  unit.acted = true;
+}
+
   if (board[side][col].length >= 3) return state; // ← 追加
 board[side][col].splice(Math.min(insertIdx, board[side][col].length), 0, unit);
   hand.splice(handIndex, 1);
