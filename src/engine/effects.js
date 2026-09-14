@@ -124,11 +124,11 @@ export function applyAction(effect, targets, ctx, state) {
       targets.forEach(t => { const u = s.board[t.side][t.col][t.idx]; if (u) { u.atk += effect.amount; u.atkTempUp = (u.atkTempUp || 0) + effect.amount; } });
       break;
 
-    case "gain_cost":
-      if (side === "blue") s.playerCost += effect.amount;
-      else s.aiCost += effect.amount;
-      log.push(`コスト+${effect.amount}獲得`);
-      break;
+   case "gain_cost":
+  if (side === "blue") s = { ...s, playerCost: s.playerCost + effect.amount };
+  else s = { ...s, aiCost: s.aiCost + effect.amount };
+  log.push(`コスト+${effect.amount}獲得`);
+  break;
 
     case "draw": {
       const deck = side === "blue" ? [...s.playerDeck] : [...s.aiDeck];
