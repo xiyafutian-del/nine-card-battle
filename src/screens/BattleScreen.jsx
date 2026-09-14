@@ -170,6 +170,7 @@ export function BattleScreen({
             onCellClick={onCellClick}
             onDragOver={handleDragOver} onDrop={handleDrop} onDragLeave={handleDragLeave}
             flipped={pvpRole === "guest"}
+            selectedGrowth={battle.selectedGrowth}
           />
         </div>
 
@@ -220,6 +221,8 @@ export function BattleScreen({
           draggingCard={draggingCard}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
+          selectedGrowth={battle.selectedGrowth}
+  onGrowthSelect={onGrowthSelect}
         />
 
         {/* ログ */}
