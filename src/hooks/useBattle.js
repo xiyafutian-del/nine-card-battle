@@ -12,6 +12,7 @@ function initBattle(mode, cardPool, deckCounts, playerGenerator) {
   const rDeck = buildDeck(cardPool, deckCounts); // AIも同じデッキを使う
   const pHand = pDeck.splice(0, 4);
   const rHand = rDeck.splice(0, 4);
+         selectedUnit: null, selectedSpell: null, selectedGrowth: null,
   const board = { blue: [[], [], []], red: [[], [], []] };
   board.blue[1] = [{ ...makeUnitFromCard(CORE_CARD), uid: "core-blue" }];
   board.red[1]  = [{ ...makeUnitFromCard(CORE_CARD), uid: "core-red" }];
@@ -91,6 +92,10 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction) {
   }
 
   function handleCellClick(row, col, extra) {
+           // 盤面外タップ（row=-1）→ 全選択キャンセル
+if (row === -1 && !extra?.spell) {
+  return { ...prev, selectedUnit: null, selectedSpell: null, selectedGrowth: null };
+}
     setBattle(prev => {
       if (!prev || prev.gameOver) return prev;
       if (prev.mode === "pve" && prev.active === "red") return prev;
@@ -148,34 +153,13 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction) {
             setTimeout(() => onAction?.(), 50);
             return ns;
           }
-          // 成長効果
-          const u = prev.board[side][col][idx];
-          if (u?.effect?.action === "growth" && !u.acted && u.summonedTurn !== prev.turn) {
-            const board2 = cloneBoard(prev.board);
-            const hand2 = active === "blue" ? [...prev.playerHand] : [...prev.aiHand];
-            const grave2 = active === "blue" ? [...(prev.playerGrave||[])] : [...(prev.aiGrave||[])];
-            const log2 = [...prev.log];
-            const e = u.effect;
-            const attrs = Array.isArray(e.filter?.attr) ? e.filter.attr : [e.filter?.attr];
-            const candidates = hand2.filter(c => attrs.includes(c.attr) && c.cost <= (e.maxCost||99))
-                                    .sort((a,b) => b.cost - a.cost);
-            if (candidates.length > 0) {
-              const card = candidates[0];
-              const hi = hand2.findIndex(c => c._k === card._k);
-              const self = board2[active][col].splice(idx, 1)[0];
-              if (self) grave2.push(self);
-              board2[active][col].splice(Math.min(idx, board2[active][col].length), 0, makeUnitFromCard(card));
-              hand2.splice(hi, 1);
-              log2.push(`${self?.name}が成長→${card.name}召喚`);
-              const costUpd = active === "blue"
-                ? { playerHand: hand2, playerGrave: grave2 }
-                : { aiHand: hand2, aiGrave: grave2 };
-              const ns = { ...prev, board: board2, log: log2, selectedUnit: null, ...costUpd };
-              setTimeout(() => onAction?.(), 50);
-              return ns;
-            }
-            return { ...prev, log: [...prev.log, "成長: 条件カードなし"], selectedUnit: null };
-          }
+                 
+ // 成長効果
+const u = prev.board[side][col][idx];
+if (u?.effect?.action === "growth" && !u.acted && u.summonedTurn !== prev.turn) {
+  // 成長カードをタップ → 選択状態に
+  return { ...prev, selectedGrowth: { col, idx, unit: u }, selectedUnit: null };
+}
           // 別ユニット選択
           if (u && !u.acted && !turn1block) return { ...prev, selectedUnit: { col, idx } };
           return { ...prev, selectedUnit: null };
@@ -192,7 +176,52 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction) {
       return prev;
     });
   }
+// 成長: 手札のカードを選択して召喚
+function handleGrowthSelect(handIndex) {
+  setBattle(prev => {
+    if (!prev || !prev.selectedGrowth) return prev;
+    const { active, selectedGrowth } = prev;
+    const { col, idx, unit: growthUnit } = selectedGrowth;
+    const hand = active === "blue" ? [...prev.playerHand] : [...prev.aiHand];
+    const grave = active === "blue" ? [...(prev.playerGrave||[])] : [...(prev.aiGrave||[])];
+    const log = [...prev.log];
+    const board = cloneBoard(prev.board);
 
+    const card = hand[handIndex];
+    if (!card) return prev;
+
+    // 条件チェック
+    const e = growthUnit.effect;
+    const attrs = Array.isArray(e.filter?.attr) ? e.filter.attr : [e.filter?.attr];
+    if (!attrs.includes(card.attr) || card.cost > (e.maxCost || 99)) {
+      return prev; // 条件外のカードは無視
+    }
+
+    // 成長カードを墓地へ
+    const growthIdx = board[active][col].findIndex(u => u.uid === growthUnit.uid);
+    if (growthIdx === -1) return prev;
+    const removed = board[active][col].splice(growthIdx, 1)[0];
+    grave.push(removed);
+
+    // 新カードを同じ位置に召喚
+    const newUnit = makeUnitFromCard(card);
+    newUnit.summonedTurn = prev.turn;
+    if (!newUnit.tags?.includes("先制")) {
+      newUnit.rotateDeg = -90;
+      newUnit.acted = true;
+    }
+    board[active][col].splice(Math.min(growthIdx, board[active][col].length), 0, newUnit);
+    hand.splice(handIndex, 1);
+    log.push(`${growthUnit.name}が成長→${card.name}召喚`);
+
+    const costUpd = active === "blue"
+      ? { playerHand: hand, playerGrave: grave }
+      : { aiHand: hand, aiGrave: grave };
+
+    return { ...prev, board, log, selectedGrowth: null, selectedUnit: null, ...costUpd };
+  });
+}
+//召喚
   function handleSummon(handIndex, row, col) {
     setBattle(prev => {
       if (!prev || prev.gameOver) return prev;
@@ -238,7 +267,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction) {
   return {
     battle, confirmLeave,
     startBattle, requestBack, leaveToLobby, endTurn,
-    handleCellClick, handleSummon,
+    handleCellClick, handleSummon,handleGrowthSelect,
     setConfirmLeave, setBattle,
   };
                                      }
