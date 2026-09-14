@@ -75,7 +75,7 @@ export default function App() {
   const {
     battle, confirmLeave,
     startBattle, requestBack, leaveToLobby, endTurn,
-    handleCellClick, handleSummon,
+    handleCellClick, handleSummon,handleGrowthSelect,
     setConfirmLeave, setBattle,
   } = useBattle(cardPool, deckCounts, playerGenerator, handleAction);
 
@@ -186,6 +186,7 @@ async function handleJoinRoom(id) {
         onSetConfirmLeave={setConfirmLeave}
         cardImages={cardImages}
         pvpRole={pvpRole}
+        onGrowthSelect={handleGrowthSelect}
       />
     );
   }
