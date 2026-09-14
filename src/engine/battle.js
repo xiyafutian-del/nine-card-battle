@@ -303,6 +303,9 @@ export function activateCard(state, side, handIndex, targetInfo) {
     grave.push(card);
   }
 
+  // applyActionの結果からコストを取得（gain_cost等で増えた値を保持）
+const finalCost = side === "blue" ? ns.playerCost : ns.aiCost;
+
   const costUpd = side === "blue"
     ? { playerHand: hand, playerCost: cost - card.cost, playerGrave: grave }
     : { aiHand: hand, aiCost: cost - card.cost, aiGrave: grave };
