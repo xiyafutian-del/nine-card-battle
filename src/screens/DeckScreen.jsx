@@ -60,7 +60,7 @@ export function DeckScreen({ cardPool, cardImages, onBack, activeDeck, onActiveD
   }
 
   function incCount(id) {
-    if (deckTotal >= 30) return;
+    if (deckTotal >= 15) return;
     setEditing(e => ({ ...e, counts: { ...e.counts, [id]: (e.counts[id] || 0) + 1 } }));
   }
   function decCount(id) {
@@ -81,7 +81,7 @@ export function DeckScreen({ cardPool, cardImages, onBack, activeDeck, onActiveD
         <div className="flex items-center justify-between mb-3">
           <button onClick={onBack} className="text-black text-sm">← ロビー</button>
           <h2 className="font-bold tracking-widest">デッキ編成</h2>
-          <div className="text-sm font-mono">{deckTotal}/30</div>
+          <div className="text-sm font-mono">{deckTotal}/15</div>
         </div>
 
         {/* デッキ名・発電機 */}
