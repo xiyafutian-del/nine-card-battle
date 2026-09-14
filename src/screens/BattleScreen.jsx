@@ -9,7 +9,7 @@ export function BattleScreen({
   battle, confirmLeave,
   onRequestBack, onLeaveToLobby, onEndTurn,
   onCellClick, onSummon, onSetConfirmLeave,
-  cardImages, pvpRole,
+  cardImages, pvpRole,onGrowthSelect,
 }) {
   const { board, active, mode, gameOver, turn, firstPlayer, selectedUnit, selectedSpell } = battle;
   const enem = active === "blue" ? "red" : "blue";
@@ -152,7 +152,14 @@ export function BattleScreen({
         </div>
 
         {/* 盤面 */}
-        <div id="battle-board">
+        <div
+  id="battle-board"
+  className="relative"
+  onClick={e => {
+    // battle-board自体をタップ（セル以外）したらキャンセル
+    if (e.target === e.currentTarget) onCellClick(-1, -1);
+  }}
+>
           <Board
             board={board} active={active} selectedUnit={selectedUnit}
             selectedSpell={selectedSpell} gameOver={isGameOver ? gameOver : null}
