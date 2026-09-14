@@ -295,8 +295,12 @@ export function activateCard(state, side, handIndex, targetInfo) {
     }
   }
 
-  let ns = applyAction(e || {}, targets, ctx, { ...state, board, log });
+// カードコストを先に引いた状態でapplyActionに渡す
+const costAfterPay = side === "blue"
+  ? { playerCost: cost - card.cost }
+  : { aiCost: cost - card.cost };
 
+let ns = applyAction(e || {}, targets, ctx, { ...state, board, log, ...costAfterPay });
   // スペルは墓地へ、魔法は手札に残る
   if (card.type === "spell") {
     hand.splice(handIndex, 1);
@@ -306,10 +310,11 @@ export function activateCard(state, side, handIndex, targetInfo) {
   // applyActionの結果からコストを取得（gain_cost等で増えた値を保持）
 const finalCost = side === "blue" ? ns.playerCost : ns.aiCost;
 
-  const costUpd = side === "blue"
-    ? { playerHand: hand, playerCost: cost - card.cost, playerGrave: grave }
-    : { aiHand: hand, aiCost: cost - card.cost, aiGrave: grave };
+ const costUpd = side === "blue"
+  ? { playerHand: hand, playerGrave: grave }
+  : { aiHand: hand, aiGrave: grave };
 
+ns = { ...ns, ...costUpd };
   ns = { ...ns, ...costUpd };
   const vc = checkVictory(board, state.turn);
   if (vc.over && !ns.gameOver) ns.gameOver = vc.winner;
