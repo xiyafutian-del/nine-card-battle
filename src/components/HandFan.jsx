@@ -6,6 +6,7 @@ export function HandFan({
   hand, handCost, handDisabled, isGameOver,
   cardImages, onSummon, onSpellActivate,
   draggingCard, onDragStart, onDragEnd,
+  selectedGrowth, onGrowthSelect,
 }) {
   const swipeRef = useRef({ startX:0, startY:0, idx:null, dragging:false, card:null });
   const boardRef = useRef(null);
@@ -54,8 +55,25 @@ export function HandFan({
       style={{height:"100px", touchAction:"none"}}
     >
       {hand.map((card, i) => {
-        const affordable = handCost >= card.cost && !handDisabled && !isGameOver;
-        const isSpellMagic = card.type === TYPES.SPELL || card.type === TYPES.MAGIC;
+      // 成長選択中かどうか
+const inGrowthMode = !!selectedGrowth;
+const growthEffect = selectedGrowth?.unit?.effect;
+const growthAttrs = growthEffect
+  ? (Array.isArray(growthEffect.filter?.attr) ? growthEffect.filter.attr : [growthEffect.filter?.attr])
+  : [];
+const growthMaxCost = growthEffect?.maxCost || 99;
+
+// このカードが成長で召喚可能か
+const isGrowthTarget = inGrowthMode &&
+  growthAttrs.includes(card.attr) &&
+  card.cost <= growthMaxCost;
+
+// 通常の召喚可能判定
+const affordable = !inGrowthMode && handCost >= card.cost && !handDisabled && !isGameOver;
+const isSpellMagic = card.type === TYPES.SPELL || card.type === TYPES.MAGIC;
+
+// 暗くするか
+const dimmed = inGrowthMode ? !isGrowthTarget : !affordable;
         const mid = (n - 1) / 2;
         const offset = i - mid;
         const rotate = offset * 7;
@@ -67,9 +85,14 @@ export function HandFan({
             key={card._k || i}
             draggable={affordable && !isSpellMagic}
             onClick={() => {
-              if (!affordable) return;
-              if (isSpellMagic) onSpellActivate(i);
-            }}
+  if (inGrowthMode) {
+    if (isGrowthTarget) onGrowthSelect(i);
+    return;
+  }
+  if (!affordable) return;
+  if (isSpellMagic) onSpellActivate(i);
+}}
+draggable={affordable && !isSpellMagic && !inGrowthMode}
             onDragStart={e => onDragStart(e, i, card)}
             onDragEnd={onDragEnd}
             onTouchStart={e => {
