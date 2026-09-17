@@ -85,10 +85,10 @@ export function LobbyScreen({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3 pt-1">
+          <div className="grid grid-cols-1 gap-3 pt-1">
             <button onClick={() => onNav("deck")} className="bg-white hover:bg-gray-100 font-semibold py-3 border border-black">
               デッキ編成
-              <div className="text-xs text-gray-400">{deckTotal}/30枚</div>
+              <div className="text-xs text-gray-400">{deckTotal}/15枚</div>
             </button>
             <button onClick={() => onNav("dex")} className="bg-white hover:bg-gray-100 font-semibold py-3 border border-black">
               カード図鑑
@@ -98,16 +98,21 @@ export function LobbyScreen({
 
         {/* ヘルプ */}
         <button onClick={() => setHelpOpen(h => !h)} className="w-full mt-4 text-left text-sm text-gray-600 border-t border-gray-300 pt-3 flex justify-between">
-          <span>ルール早見表</span><span>{helpOpen ? "▲" : "▼"}</span>
+          <span>ルール</span><span>{helpOpen ? "▲" : "▼"}</span>
         </button>
         {helpOpen && (
           <div className="text-xs text-gray-600 leading-relaxed space-y-1.5 mt-2 border border-gray-300 p-3">
             <p>盤面は自陣3×3。コア（HP10）が中央前列に配置、破壊されたら負け。</p>
-            <p><b>勝利条件</b>：①コア破壊 ②25T経過→コアHP比較→場HP合計比較→引き分け</p>
+            <p><b>勝利条件</b>：コア破壊</p>
+            <p><b>デッキ</b>：15枚のカードを選択し自由に組む。同名制限無し。</p>
             <p><b>発電機</b>：種類によりコスト収入パターンが変わる。</p>
-            <p><b>施設</b>：移動不可・前詰めなし。畑/商店は毎ターン+1コスト。</p>
-            <p><b>成長</b>：草属性施設をタップで自身を破壊し手札のカードを召喚。</p>
-            <p>手札をスワイプ/ドラッグで召喚。ユニットタップで橙=攻撃/緑=移動。</p>
+            <p><b>　ユニット</b>：自動で前詰め。選択で移動可能</p>
+            <p><b>　施設</b>：移動不可・前詰めなし。</p>
+            <p><b>　　長方形射程</b>：n.mとして表される。nが自分のいる列を中心とした列数、mが自分のいる行の何行先までかを表す。</p>
+            <p><b>　　ひし形射程</b>：dkとして表される。自身からkマス移動して届く範囲を攻撃可能。</p>
+            <p><b>　タンク</b>：長方形射程の列またはひし形射程の経路に入ることにより自身以降のカードを選択不可にする。</p>
+            <p><b>　成長</b>：自身をタップし、手札から条件に合うカードを選択で召喚。。</p>
+            <p>手札をスワイプ/ドラッグ(0.5秒ぐらい)で召喚。ユニットタップで橙=攻撃/緑=移動。</p>
           </div>
         )}
       </div>
