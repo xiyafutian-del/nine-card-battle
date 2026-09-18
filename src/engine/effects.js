@@ -327,24 +327,34 @@ function applyCondEffect(effect, unit) {
 }
 
 // 全ユニットの条件付き効果を再評価（行動のたびに呼ぶ）
+
 export function applyConditionals(state, side) {
   const cost = side === "blue" ? state.playerCost : state.aiCost;
   const hand = side === "blue" ? state.playerHand : state.aiHand;
   const board = state.board;
 
-  board[side].forEach((col, ci) => {
-    col.forEach((unit, ri) => {
-      if (!unit?.conditional) return;
-      const { condition, effect } = unit.conditional;
+  // 両サイド確認（相手側の条件も評価）
+  ["blue", "red"].forEach(s => {
+    const sCost = s === "blue" ? state.playerCost : state.aiCost;
+    const sHand = s === "blue" ? state.playerHand : state.aiHand;
 
-      // ベース値にリセット
-      unit.atk    = unit.baseAtk;
-      unit.vRange = unit.baseVRange;
-      unit.tags   = [...(unit.baseTags || [])];
+    board[s].forEach((col, ci) => {
+      col.forEach((unit, ri) => {
+        if (!unit?.conditional) return;
+        const { condition, effect } = unit.conditional;
 
-      // 条件評価して満たしていれば効果適用
-      const met = checkCondition(condition, { unit, ci, ri, board, side, cost, hand });
-      if (met) applyCondEffect(effect, unit);
+        // ベース値にリセット
+        unit.atk    = unit.baseAtk;
+        unit.vRange = unit.baseVRange;
+        unit.tags   = [...(unit.baseTags || [])];
+
+        // 条件評価
+        const met = checkCondition(condition, {
+          unit, ci, ri, board, side: s,
+          cost: sCost, hand: sHand
+        });
+        if (met) applyCondEffect(effect, unit);
+      });
     });
   });
 
