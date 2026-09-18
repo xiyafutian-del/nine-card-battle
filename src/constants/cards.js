@@ -62,13 +62,13 @@ export const INITIAL_CARDS = [
   card(20, "幸運",   0, 0, 0, "1.1", "spell", "none",
     { effect:{ trigger:"activate", target:"self", action:"gain_cost", amount:1 },
       desc:"1コスト獲得" }),
-  card(21, "落雷",   102, 0, 0, "1.1", "spell", "none",
+  card(21, "落雷",   2, 0, 0, "1.1", "spell", "none",
     { effect:{ trigger:"activate", target:"select_enemy", action:"damage", amount:3 },
       targetType:"enemy", desc:"敵1体に3ダメージ" }),
-  card(22, "増援",   103, 0, 0, "1.1", "spell", "none",
+  card(22, "加速",   3, 0, 0, "1.1", "spell", "none",
     { effect:{ trigger:"activate", target:"self", action:"draw", amount:2 },
-      desc:"2枚ドロー" }),
-  card(23, "治癒",   102, 0, 0, "1.1", "spell", "none",
+      desc:"3枚ドロー" }),
+  card(23, "治癒",   2, 0, 0, "1.1", "spell", "none",
     { effect:{ trigger:"activate", target:"select_ally", action:"heal", amount:3 },
       targetType:"ally", desc:"味方1体HP+3回復" }),
   card(24, "投石",   1, 0, 0, "1.1", "spell", "none",
@@ -82,10 +82,10 @@ export const INITIAL_CARDS = [
       desc:"敵プレイヤーに1ダメージ" }),
 
   // ── 魔法 ──
-  card(27, "爆炎",     105, 0, 0, "1.1", "magic", "none",
+  card(27, "爆炎",     5, 0, 0, "1.1", "magic", "none",
     { effect:{ trigger:"activate", target:"all_enemy_front", action:"damage", amount:3 },
       desc:"敵前列全体に3ダメージ" }),
-  card(28, "強化の書", 104, 0, 0, "1.1", "magic", "none",
+  card(28, "強化の書", 4, 0, 0, "1.1", "magic", "none",
     { effect:{ trigger:"activate", target:"select_ally", action:"atk_up_temp", amount:3 },
       targetType:"ally", desc:"味方1体ATK+3（このターン）" }),
 
@@ -139,7 +139,7 @@ export const INITIAL_CARDS = [
     { effect:{ trigger:"activate", target:"random_enemy_multi", action:"damage_multi", amount:3, times:3 },
       desc:"ランダムに3回選び選ばれた回数×3ダメージ" }),
 //トランプtrump属性
-card(1001,  "スペードのA",        1, 1,  1, "1.1", "unit",     "trump", {
+card(1001,  "スペードのA",        91, 1,  1, "1.1", "unit",     "trump", {
   conditional: {
     condition: { type: "cost_gte", value: 10 },
     effect:    { type: "atk_up",  value: 10 },
@@ -160,17 +160,17 @@ card(1104,  "火縄銃",        3, 3,  4, "1.3", "unit",     "none",{ tags:["速
 card(1109,  "狐",        9, 7,  2, "３.3", "unit",     "none",{ tags:["先制","２回行動"] }),
 //ヨーロッパ
   // 同行にEU属性3体
-card(1201, "盾兵", 2, 5, 1, "1.1", "unit", "eu", {
+card(1201, "盾兵", 92, 5, 1, "1.1", "unit", "eu", {
   conditional: {
     condition: { type: "row_attr", value: "eu", count: 3 },
     effect:    { type: "tag_add",  value: "タンク" },},
   desc: "同列にヨーロッパ属性3体でタンク"}),
-  card(1202, "弓兵", 2, 2, 2, "1.2", "unit", "eu", {
+  card(1202, "弓兵", 92, 2, 2, "1.2", "unit", "eu", {
   conditional: {
     condition: { type: "row_attr", value: "eu", count: 3 },
     effect:    { type: "atk_up",  value: 1 },},
   desc: "同列にヨーロッパ属性3体で縦射程+1"}),
-  card(1203, "馬兵", 4, 4, 3, "1.1", "unit", "eu", {
+  card(1203, "馬兵", 94, 4, 3, "1.1", "unit", "eu", {
   conditional: {
     condition: { type: "row_attr", value: "eu", count: 3 },
     effect:    { type: "atk_up",  value: 2 },},
@@ -206,13 +206,13 @@ card(1201, "盾兵", 2, 5, 1, "1.1", "unit", "eu", {
   card(3101, "シダンゴ虫",       2, 5, 1, "1.1", "unit", "bug"),
   card(3102, "羽葉蝶",       3, 2, 2, "3.1", "unit", "bug"),
   card(3103, "点灯虫",       4, 1, 3, "d2", "unit", "bug",{ tags:["タンク"] }),
-  card(54, "食虫木",       4, 5, 3, "1.1", "unit", "grass",
+  card(54, "食虫木",       4, 3, 3, "1.1", "unit", "grass",
     { effect:{ trigger:"on_attack", target:"self", action:"heal", amount:"damage_dealt" },
       desc:"攻撃時与ダメージ分HP回復" }),
   card(55, "わたげツリー", 6, 5, 2, "3.2", "unit", "grass",
     { effect:{ trigger:"on_summon", target:"hand", action:"free_summon", filter:{ attr:"grass", maxCost:0 } },
       desc:"召喚時手札のコスト0草属性を無償召喚" }),
-  card(56, "ボムツリー",   7, 6, 4, "3.1", "unit", "grass",
+  card(56, "ボムツリー",   7, 3, 4, "3.1", "unit", "grass",
     { effect:{ trigger:"on_death", target:"adj_all", action:"damage", amount:2 },
       desc:"破壊時隣接する全カードに2ダメージ" }),
   card(57, "自然龍",       9, 9, 3, "3.2", "unit", "grass",
