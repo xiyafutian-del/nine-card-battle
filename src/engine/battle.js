@@ -166,12 +166,12 @@ return state;
     }
   }));
 
-  const upd = side === "blue"
+const upd = side === "blue"
     ? { playerHand: hand, playerDeck: deck, playerCost: cost }
     : { aiHand: hand, aiDeck: deck, aiCost: cost };
-  applyConditionals(state, side);
-return state;
-  return { ...state, board, log, ...upd };
+  const newState = { ...state, board, log, ...upd };
+  applyConditionals(newState, side);
+  return newState;
 }
 
 // ============ 召喚処理 ============
@@ -219,6 +219,7 @@ board[side][col].splice(Math.min(insertIdx, board[side][col].length), 0, unit);
   const ns = { ...state, board, log, ...costUpd };
   applyConditionals(ns, side);
 return ns;
+         applyConditionals(ns, side);
   return checkVictory(board, state.turn).over ? { ...ns, gameOver: checkVictory(board, state.turn).winner } : ns;
 }
 
@@ -281,6 +282,7 @@ if (has2act && attacker.actCount < 2) {
   if (vc.over && !ns.gameOver) ns.gameOver = vc.winner;
   applyConditionals(ns, active);
 return ns;
+         applyConditionals(ns, side);
   return ns;
 }
 
@@ -337,5 +339,6 @@ ns = { ...ns, ...costUpd };
   if (vc.over && !ns.gameOver) ns.gameOver = vc.winner;
   applyConditionals(ns, side);
 return ns;
+         applyConditionals(ns, side);
   return ns;
 }
