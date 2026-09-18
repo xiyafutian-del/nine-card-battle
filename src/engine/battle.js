@@ -1,7 +1,8 @@
 import { TYPES, MAX_TURNS, getGeneratorCost } from '../constants/index.js';
 import { makeUnitFromCard, shuffle, resolveTargets, applyAction,
          calcForgeBonus, calcPassiveCostReduction,
-         applyConditionals } from './effects.js'; // ← 追加
+         applyConditionals } from './effects.js';
+
 // ============ 盤面クローン ============
 export function cloneBoard(board) {
   return {
@@ -73,7 +74,7 @@ export function getDiamondTargets(side, col, idx, dRange, board) {
 }
 
 export function getAttackTargets(side, col, idx, unit, board) {
-  if (!unit || unit.atk <= 0) return []; // ← 追加
+  if (!unit || unit.atk <= 0) return [];
   if (unit.rangeType === "diamond")
     return getDiamondTargets(side, col, idx, unit.dRange || 1, board);
   return getValidTargets(side, col, idx, unit.hRange, unit.vRange, board);
@@ -137,17 +138,15 @@ export function applyTurnStart(state, side, generatorType) {
   // ドロー
   if (deck.length > 0 && hand.length < 10) hand.push(deck.shift());
 
-  //アンタップ
-board[side].forEach(col => col.forEach(u => {
-  if (u) {
-    u.rotateDeg = Math.min(0, (u.rotateDeg || 0) + 90);
-    u.actCount = 0;
-    u.stunned = false;
-  }
-  // 条件付き効果を再評価
-applyConditionals(state, side);
-return state;
-}));
+  // アンタップ
+  board[side].forEach(col => col.forEach(u => {
+    if (u) {
+      u.rotateDeg = Math.min(0, (u.rotateDeg || 0) + 90);
+      u.actCount = 0;
+      u.stunned = false;
+      u.acted = false;
+    }
+  }));
   
   // 発電機コスト
   const gained = getGeneratorCost(generatorType || "water", state.turn);
@@ -166,12 +165,14 @@ return state;
     }
   }));
 
-const upd = side === "blue"
+  const upd = side === "blue"
     ? { playerHand: hand, playerDeck: deck, playerCost: cost }
     : { aiHand: hand, aiDeck: deck, aiCost: cost };
-  const newState = { ...state, board, log, ...upd };
-          console.log("applyConditionals cost:", side === "blue" ? newState.playerCost : newState.aiCost);
-  applyConditionals(newState, side);
+
+  let newState = { ...state, board, log, ...upd };
+
+  // 条件付き効果を最新の状態に対して適用
+  newState = applyConditionals(newState, side);
   return newState;
 }
 
@@ -191,18 +192,18 @@ export function summonUnit(state, side, handIndex, col, insertIdx) {
 
   const board = cloneBoard(state.board);
   const log = [...state.log];
+  if (board[side][col].length >= 3) return state;
+
   const unit = makeUnitFromCard(card);
   unit.summonedTurn = state.turn;
 
-  unit.summonedTurn = state.turn;
-// 先制タグがなければ召喚時に反時計90度回転（行動済み扱い）
-if (!unit.tags?.includes("先制")) {
-  unit.rotateDeg = -90;
-  unit.acted = true;
-}
+  // 先制タグがなければ召喚時に反時計90度回転（行動済み扱い）
+  if (!unit.tags?.includes("先制")) {
+    unit.rotateDeg = -90;
+    unit.acted = true;
+  }
 
-  if (board[side][col].length >= 3) return state; // ← 追加
-board[side][col].splice(Math.min(insertIdx, board[side][col].length), 0, unit);
+  board[side][col].splice(Math.min(insertIdx, board[side][col].length), 0, unit);
   hand.splice(handIndex, 1);
   log.push(`${card.name}を召喚`);
 
@@ -217,11 +218,11 @@ board[side][col].splice(Math.min(insertIdx, board[side][col].length), 0, unit);
     ? { playerHand: hand, playerCost: cost - finalCost, playerGrave: grave }
     : { aiHand: hand, aiCost: cost - finalCost, aiGrave: grave };
 
-  const ns = { ...state, board, log, ...costUpd };
-  applyConditionals(ns, side);
-return ns;
-         applyConditionals(ns, side);
-  return checkVictory(board, state.turn).over ? { ...ns, gameOver: checkVictory(board, state.turn).winner } : ns;
+  let ns = { ...state, board, log, ...costUpd };
+  ns = applyConditionals(ns, side);
+
+  const vc = checkVictory(board, state.turn);
+  return vc.over ? { ...ns, gameOver: vc.winner } : ns;
 }
 
 // ============ 攻撃処理 ============
@@ -237,15 +238,15 @@ export function attackUnit(state, side, atkCol, atkIdx, defCol, defIdx) {
   const dmg = attacker.atk + bonus;
   defender.hp -= dmg;
   attacker.actCount = (attacker.actCount || 0) + 1;
-const has2act = attacker.tags?.includes("2回行動");
-const hasRecoil = attacker.tags?.includes("反動");
-if (has2act && attacker.actCount < 2) {
-  // 1回目はまだ行動可能
-} else {
-  attacker.acted = true;
-  const baseDeg = hasRecoil ? 180 : 90;
-  attacker.rotateDeg = (attacker.rotateDeg || 0) - baseDeg;
-}
+  const has2act = attacker.tags?.includes("2回行動");
+  const hasRecoil = attacker.tags?.includes("反動");
+  if (has2act && attacker.actCount < 2) {
+    // 1回目はまだ行動可能
+  } else {
+    attacker.acted = true;
+    const baseDeg = hasRecoil ? 180 : 90;
+    attacker.rotateDeg = (attacker.rotateDeg || 0) - baseDeg;
+  }
   log.push(`${attacker.name}→${defender.name}に${dmg}ダメージ`);
 
   // 機械属リンク
@@ -281,8 +282,9 @@ if (has2act && attacker.actCount < 2) {
 
   const vc = checkVictory(board, state.turn);
   if (vc.over && !ns.gameOver) ns.gameOver = vc.winner;
-  applyConditionals(ns, side);
-return ns;
+
+  ns = applyConditionals(ns, side);
+  return ns;
 }
 
 // ============ スペル/魔法発動 ============
@@ -300,7 +302,6 @@ export function activateCard(state, side, handIndex, targetInfo) {
 
   log.push(`${card.name}を使用`);
 
-  // targetInfo があれば selectedTarget として context に渡す
   const ctx = { board, side, col: targetInfo?.col, idx: targetInfo?.idx, hand, grave, log, selectedTarget: targetInfo };
 
   let targets = [];
@@ -313,30 +314,25 @@ export function activateCard(state, side, handIndex, targetInfo) {
     }
   }
 
-// カードコストを先に引いた状態でapplyActionに渡す
-const costAfterPay = side === "blue"
-  ? { playerCost: cost - card.cost }
-  : { aiCost: cost - card.cost };
+  const costAfterPay = side === "blue"
+    ? { playerCost: cost - card.cost }
+    : { aiCost: cost - card.cost };
 
-let ns = applyAction(e || {}, targets, ctx, { ...state, board, log, ...costAfterPay });
-  // スペルは墓地へ、魔法は手札に残る
+  let ns = applyAction(e || {}, targets, ctx, { ...state, board, log, ...costAfterPay });
+
   if (card.type === "spell") {
     hand.splice(handIndex, 1);
     grave.push(card);
   }
 
-  // applyActionの結果からコストを取得（gain_cost等で増えた値を保持）
-const finalCost = side === "blue" ? ns.playerCost : ns.aiCost;
+  const costUpd = side === "blue"
+    ? { playerHand: hand, playerGrave: grave }
+    : { aiHand: hand, aiGrave: grave };
 
- const costUpd = side === "blue"
-  ? { playerHand: hand, playerGrave: grave }
-  : { aiHand: hand, aiGrave: grave };
-
-ns = { ...ns, ...costUpd };
   ns = { ...ns, ...costUpd };
   const vc = checkVictory(board, state.turn);
   if (vc.over && !ns.gameOver) ns.gameOver = vc.winner;
-  applyConditionals(ns, side);
-return ns;
 
+  ns = applyConditionals(ns, side);
+  return ns;
 }
