@@ -269,6 +269,10 @@ export function makeUnitFromCard(card) {
     rotateDeg: 0,        // 現在の回転角度
 actCount: 0,         // 行動回数（2回行動用）
 stunned: false,      // スタン状態
+    baseAtk: card.atk,
+    baseVRange: card.vRange || 1,
+    baseTags: card.tags || [],
+    conditional: card.conditional || null,
     _k: card._k || nextKey(),
   };
 }
@@ -280,4 +284,69 @@ export function shuffle(arr) {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+// ============ 条件付き効果システム ============
+
+function checkCondition(cond, ctx) {
+  const { unit, ci, ri, board, side, cost, hand } = ctx;
+  switch (cond.type) {
+    case "cost_gte":   return cost >= cond.value;
+    case "cost_lte":   return cost <= cond.value;
+    case "hand_gte":   return hand.length >= cond.value;
+    case "hand_lte":   return hand.length <= cond.value;
+    case "hp_lte":     return unit.hp <= cond.value;
+    case "hp_gte":     return unit.hp >= cond.value;
+    case "row_eq":     return ri + 1 === cond.value; // 1=前列, 2=中, 3=後列
+    case "field_attr": {
+      const total = board[side].flat().filter(u => u && u.attr === cond.value).length;
+      return total >= (cond.count || 1);
+    }
+    case "col_attr": {
+      // 同じ列に指定属性がcount体以上
+      const colUnits = board[side][ci].filter(u => u && u.attr === cond.value);
+      return colUnits.length >= (cond.count || 1);
+    }
+    case "row_attr": {
+      // 同じ行（idx）に指定属性がcount体以上
+      const rowUnits = board[side].map(c => c[ri]).filter(u => u && u.attr === cond.value);
+      return rowUnits.length >= (cond.count || 1);
+    }
+    default: return false;
+  }
+}
+
+function applyCondEffect(effect, unit) {
+  switch (effect.type) {
+    case "atk_up":    unit.atk    += effect.value; break;
+    case "vrange_up": unit.vRange += effect.value; break;
+    case "hp_up":     unit.hp     = Math.min(unit.maxHp, unit.hp + effect.value); break;
+    case "tag_add":
+      if (!unit.tags.includes(effect.value)) unit.tags.push(effect.value);
+      break;
+  }
+}
+
+// 全ユニットの条件付き効果を再評価（行動のたびに呼ぶ）
+export function applyConditionals(state, side) {
+  const cost = side === "blue" ? state.playerCost : state.aiCost;
+  const hand = side === "blue" ? state.playerHand : state.aiHand;
+  const board = state.board;
+
+  board[side].forEach((col, ci) => {
+    col.forEach((unit, ri) => {
+      if (!unit?.conditional) return;
+      const { condition, effect } = unit.conditional;
+
+      // ベース値にリセット
+      unit.atk    = unit.baseAtk;
+      unit.vRange = unit.baseVRange;
+      unit.tags   = [...(unit.baseTags || [])];
+
+      // 条件評価して満たしていれば効果適用
+      const met = checkCondition(condition, { unit, ci, ri, board, side, cost, hand });
+      if (met) applyCondEffect(effect, unit);
+    });
+  });
+
+  return state;
 }
