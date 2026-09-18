@@ -2,7 +2,7 @@ import { ATTRS } from '../constants/index.js';
 
 // ============ ターゲット解決 ============
 export function resolveTargets(target, ctx) {
-  const { board, side, col, idx, hand, grave } = ctx;
+  const { board, side, col, idx, hand } = ctx;
   const enem = side === "blue" ? "red" : "blue";
 
   // 磁力持ちがいれば random 系はそちらに向く
@@ -48,25 +48,13 @@ export function resolveTargets(target, ctx) {
     case "enemy_front_col":   return board[enem][col]?.[0] ? [{ side: enem, col, idx: 0 }] : [];
     case "hand":              return hand ? [{ hand: true }] : [];
     case "grave":             return [{ grave: true }];
-    case "stun":
-  targets.forEach(t => {
-    const u = s.board[t.side][t.col][t.idx];
-    if (u) {
-      u.acted = true;
-      u.stunned = true;
-      u.rotateDeg = -90;
-      log.push(`${u.name}がスタンした`);
-    }
-  });
-  break;
     default:                  return [];
   }
 }
 
 // ============ アクション実行 ============
-// state を受け取り新しい state を返す（immutable）
 export function applyAction(effect, targets, ctx, state) {
-  const { board, side, col, idx, hand, grave, log } = ctx;
+  const { side, col, idx, log } = ctx;
   let s = { ...state };
   const enem = side === "blue" ? "red" : "blue";
 
@@ -76,7 +64,6 @@ export function applyAction(effect, targets, ctx, state) {
     u.hp -= amount;
     log.push(`${u.name}に${amount}ダメージ`);
     if (u.hp <= 0) {
-      // on_death 効果
       if (u.effect?.trigger === "on_death") {
         const deathCtx = { ...ctx, board: s.board, side: tside, col: tcol, idx: tidx, log };
         const deathTargets = resolveTargets(u.effect.target, deathCtx);
@@ -124,11 +111,23 @@ export function applyAction(effect, targets, ctx, state) {
       targets.forEach(t => { const u = s.board[t.side][t.col][t.idx]; if (u) { u.atk += effect.amount; u.atkTempUp = (u.atkTempUp || 0) + effect.amount; } });
       break;
 
-  case "gain_cost":
-  if (side === "blue") s = { ...s, playerCost: (s.playerCost || 0) + effect.amount };
-  else s = { ...s, aiCost: (s.aiCost || 0) + effect.amount };
-  log.push(`コスト+${effect.amount}獲得`);
-  break;
+    case "stun":
+      targets.forEach(t => {
+        const u = s.board[t.side][t.col][t.idx];
+        if (u) {
+          u.acted = true;
+          u.stunned = true;
+          u.rotateDeg = -90;
+          log.push(`${u.name}がスタンした`);
+        }
+      });
+      break;
+
+    case "gain_cost":
+      if (side === "blue") s = { ...s, playerCost: (s.playerCost || 0) + effect.amount };
+      else s = { ...s, aiCost: (s.aiCost || 0) + effect.amount };
+      log.push(`コスト+${effect.amount}獲得`);
+      break;
 
     case "draw": {
       const deck = side === "blue" ? [...s.playerDeck] : [...s.aiDeck];
@@ -197,10 +196,6 @@ export function applyAction(effect, targets, ctx, state) {
       break;
     }
 
-    case "forge_adj":
-      // passive: 鍛冶場の隣接ATK+1は攻撃時に参照
-      break;
-
     default:
       break;
   }
@@ -211,9 +206,6 @@ export function applyAction(effect, targets, ctx, state) {
 // ============ パッシブ効果の計算 ============
 export function calcPassiveCostReduction(card, side, board, grave) {
   let reduction = 0;
-  const effects = Array.isArray(board[side].flat().map(u => u?.effect).filter(Boolean))
-    ? board[side].flat().map(u => u?.effect).filter(Boolean)
-    : [];
 
   board[side].flat().forEach(u => {
     if (!u?.effect) return;
@@ -223,7 +215,7 @@ export function calcPassiveCostReduction(card, side, board, grave) {
       if (attrs.includes(card.attr)) {
         const stack = board[side].flat().filter(x => x?.effect?.action === "cost_minus_attr" && JSON.stringify(x.effect.filter) === JSON.stringify(e.filter)).length;
         reduction += Math.min(e.maxStack || 99, stack) * (e.amount || 1);
-        return; // 同種は一度だけカウント
+        return;
       }
     }
     if (e.action === "cost_minus_by_grave" && card.attr === u.attr) {
@@ -260,15 +252,15 @@ export function makeUnitFromCard(card) {
     isCore: card.id === "core",
     isFacility: card.type === "facility",
     acted: false,
-      cost: card.cost,
-    tags: card.tags || [],        // ← 追加
-    desc: card.desc || "",        // ← 追加
-    originalCost: card.cost,  // ← 追加（召喚後も元コストを保持）
+    cost: card.cost,
+    tags: card.tags || [],
+    desc: card.desc || "",
+    originalCost: card.cost,
     summonedTurn: null,
     image: card.image || null,
-    rotateDeg: 0,        // 現在の回転角度
-actCount: 0,         // 行動回数（2回行動用）
-stunned: false,      // スタン状態
+    rotateDeg: 0,
+    actCount: 0,
+    stunned: false,
     baseAtk: card.atk,
     baseVRange: card.vRange || 1,
     baseTags: card.tags || [],
@@ -285,29 +277,30 @@ export function shuffle(arr) {
   }
   return a;
 }
+
 // ============ 条件付き効果システム ============
 
 function checkCondition(cond, ctx) {
   const { unit, ci, ri, board, side, cost, hand } = ctx;
+  if (!cond) return false;
+
   switch (cond.type) {
     case "cost_gte":   return cost >= cond.value;
     case "cost_lte":   return cost <= cond.value;
-    case "hand_gte":   return hand.length >= cond.value;
-    case "hand_lte":   return hand.length <= cond.value;
+    case "hand_gte":   return (hand?.length || 0) >= cond.value;
+    case "hand_lte":   return (hand?.length || 0) <= cond.value;
     case "hp_lte":     return unit.hp <= cond.value;
     case "hp_gte":     return unit.hp >= cond.value;
-    case "row_eq":     return ri + 1 === cond.value; // 1=前列, 2=中, 3=後列
+    case "row_eq":     return ri + 1 === cond.value;
     case "field_attr": {
       const total = board[side].flat().filter(u => u && u.attr === cond.value).length;
       return total >= (cond.count || 1);
     }
     case "col_attr": {
-      // 同じ列に指定属性がcount体以上
       const colUnits = board[side][ci].filter(u => u && u.attr === cond.value);
       return colUnits.length >= (cond.count || 1);
     }
     case "row_attr": {
-      // 同じ行（idx）に指定属性がcount体以上
       const rowUnits = board[side].map(c => c[ri]).filter(u => u && u.attr === cond.value);
       return rowUnits.length >= (cond.count || 1);
     }
@@ -316,6 +309,7 @@ function checkCondition(cond, ctx) {
 }
 
 function applyCondEffect(effect, unit) {
+  if (!effect) return;
   switch (effect.type) {
     case "atk_up":    unit.atk    += effect.value; break;
     case "vrange_up": unit.vRange += effect.value; break;
@@ -326,37 +320,46 @@ function applyCondEffect(effect, unit) {
   }
 }
 
-// 全ユニットの条件付き効果を再評価（行動のたびに呼ぶ）
-
+// 全ユニットの条件付き効果を再評価
 export function applyConditionals(state, side) {
-  const cost = side === "blue" ? state.playerCost : state.aiCost;
-  const hand = side === "blue" ? state.playerHand : state.aiHand;
-  const board = state.board;
+  // state と board のディープコピーを作成して参照を切る
+  const newState = {
+    ...state,
+    board: {
+      blue: state.board.blue.map(col => col.map(u => u ? { ...u, tags: [...(u.tags || [])] } : null)),
+      red:  state.board.red.map(col => col.map(u => u ? { ...u, tags: [...(u.tags || [])] } : null)),
+    }
+  };
 
-  // 両サイド確認（相手側の条件も評価）
+  const board = newState.board;
+
   ["blue", "red"].forEach(s => {
-    const sCost = s === "blue" ? state.playerCost : state.aiCost;
-    const sHand = s === "blue" ? state.playerHand : state.aiHand;
+    const sCost = s === "blue" ? newState.playerCost || 0 : newState.aiCost || 0;
+    const sHand = s === "blue" ? newState.playerHand || [] : newState.aiHand || [];
 
     board[s].forEach((col, ci) => {
       col.forEach((unit, ri) => {
         if (!unit?.conditional) return;
-        const { condition, effect } = unit.conditional;
 
         // ベース値にリセット
-        unit.atk    = unit.baseAtk;
-        unit.vRange = unit.baseVRange;
+        unit.atk    = unit.baseAtk ?? unit.atk;
+        unit.vRange = unit.baseVRange ?? unit.vRange ?? 1;
         unit.tags   = [...(unit.baseTags || [])];
 
-        // 条件評価
-        const met = checkCondition(condition, {
-          unit, ci, ri, board, side: s,
-          cost: sCost, hand: sHand
+        // 配列形式と単体形式の両方に対応
+        const condList = Array.isArray(unit.conditional) ? unit.conditional : [unit.conditional];
+
+        condList.forEach(condObj => {
+          const { condition, effect } = condObj;
+          const met = checkCondition(condition, {
+            unit, ci, ri, board, side: s,
+            cost: sCost, hand: sHand
+          });
+          if (met) applyCondEffect(effect, unit);
         });
-        if (met) applyCondEffect(effect, unit);
       });
     });
   });
 
-  return state;
+  return newState;
 }
