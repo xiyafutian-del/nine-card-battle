@@ -85,7 +85,7 @@ export function LobbyScreen({
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-3 pt-1">
+          <div className="grid grid-cols-3 gap-3 pt-1">
             <button onClick={() => onNav("deck")} className="bg-white hover:bg-gray-100 font-semibold py-3 border border-black">
               デッキ編成
               <div className="text-xs text-gray-400">{deckTotal}/15枚</div>
@@ -101,7 +101,7 @@ export function LobbyScreen({
           <span>ルール</span><span>{helpOpen ? "▲" : "▼"}</span>
         </button>
         {helpOpen && (
-          <div className="text-xs text-gray-600 leading-relaxed space-y-1.5 mt-2 border border-gray-300 p-3">
+          <div className="text-xs text-gray-300 leading-relaxed space-y-1.5 mt-2 border border-gray-300 p-3">
             <p>盤面は自陣3×3。コア（HP10）が中央前列に配置、破壊されたら負け。</p>
             <p><b>勝利条件</b>：コア破壊</p>
             <p><b>デッキ</b>：15枚のカードを選択し自由に組む。同名制限無し。</p>
