@@ -170,7 +170,7 @@ card(1201, "盾兵", 2, 5, 1, "1.1", "unit", "eu", {
   card(1202, "弓兵", 2, 2, 2, "1.2", "unit", "eu", {
   conditional: {
     condition: { type: "row_attr", value: "eu", count: 3 },
-    effect:    { type: "vrange_up",  value: 1 },},
+    effect:    { type: "atk_up",  value: 1 },},
   desc: "同列にヨーロッパ属性3体で縦射程+1"}),
   card(1203, "馬兵", 4, 4, 3, "1.1", "unit", "eu", {
   conditional: {
