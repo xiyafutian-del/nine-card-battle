@@ -170,6 +170,7 @@ const upd = side === "blue"
     ? { playerHand: hand, playerDeck: deck, playerCost: cost }
     : { aiHand: hand, aiDeck: deck, aiCost: cost };
   const newState = { ...state, board, log, ...upd };
+          console.log("applyConditionals cost:", side === "blue" ? newState.playerCost : newState.aiCost);
   applyConditionals(newState, side);
   return newState;
 }
