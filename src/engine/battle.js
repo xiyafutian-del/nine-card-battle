@@ -282,8 +282,6 @@ if (has2act && attacker.actCount < 2) {
   if (vc.over && !ns.gameOver) ns.gameOver = vc.winner;
   applyConditionals(ns, active);
 return ns;
-         applyConditionals(ns, side);
-  return ns;
 }
 
 // ============ スペル/魔法発動 ============
@@ -339,6 +337,5 @@ ns = { ...ns, ...costUpd };
   if (vc.over && !ns.gameOver) ns.gameOver = vc.winner;
   applyConditionals(ns, side);
 return ns;
-         applyConditionals(ns, side);
-  return ns;
+
 }
