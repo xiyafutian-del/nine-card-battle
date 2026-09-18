@@ -147,7 +147,9 @@ card(1001,  "スペードのA",        1, 1,  1, "1.1", "unit",     "trump", {
     effect:    { type: "atk_up",  value: 10 },
   },desc: "コスト10以上の時ATK+10"}),
 card(1002,  "スペードの2",        2, 2,  1, "3.1", "unit",     "trump"),
-card(1003,  "スペードの3",        3, 2,  1, "1.1", "unit",     "trump"),
+card(1003,  "スペードの3",        3, 2,  1, "1.1", "unit",     "trump",
+     { effect:{ trigger:"passive", action:"cost_minus_attr", filter:{ attr:"trump" }, amount:1, maxStack:3 },
+      desc:"トランプ属性の召喚コスト-1（3枚まで）" }),
 card(1004,  "スペードの4",        104, 2,  2, "1.4", "unit",     "trump"),
 card(1005,  "スペードの5",        101, 1,  2, "1.1", "unit",     "trump"),
 card(1006,  "スペードの6",        101, 1,  2, "1.1", "unit",     "none"),
@@ -170,11 +172,21 @@ card(1201, "盾兵", 2, 5, 1, "1.1", "unit", "eu", {
   card(1202, "弓兵", 2, 2, 2, "1.2", "unit", "eu", {
   conditional: {
     condition: { type: "row_attr", value: "eu", count: 3 },
-    effect:    { type: "atk_up",  value: 1 },},
+    effect:    { type: "vrange_up",  value: 1 },},
   desc: "同列にヨーロッパ属性3体で縦射程+1"}),
-  card(1203, "馬兵", 4, 4, 3, "1.1", "unit", "eu", {
+  card(1203, "槍兵", 3, 3, 2, "1.2", "unit", "eu", {
   conditional: {
-    condition: { type: "row_attr", value: "eu", count: 3 },
+    condition: { type: "col_attr", value: "eu", count: 3 },
+    effect:    { type: "atk_up",  value: 2 },},
+  desc: "同列にヨーロッパ属性3体で攻撃+2"}),
+  card(1204, "カタパルト", 6, 3, 2, "1.2", "unit", "eu", {
+  conditional: {
+    condition: { type: "col_attr", value: "eu", count: 3 },
+    effect:    { type: "vrange_up",  value: 2 },},
+  desc: "同列にヨーロッパ属性3体で縦射程+1"}),
+  card(1205, "チャリオット", 93, 3, 2, "1.2", "unit", "eu", {
+  conditional: {
+    condition: { type: "col_attr", value: "eu", count: 3 },
     effect:    { type: "atk_up",  value: 2 },},
   desc: "同列にヨーロッパ属性3体で攻撃+2"}),
   // ── 草属性施設（成長チェーン） ──
