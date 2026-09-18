@@ -1,6 +1,7 @@
 import { TYPES, MAX_TURNS, getGeneratorCost } from '../constants/index.js';
-import { makeUnitFromCard, shuffle, resolveTargets, applyAction, calcForgeBonus, calcPassiveCostReduction } from './effects.js';
-
+import { makeUnitFromCard, shuffle, resolveTargets, applyAction,
+         calcForgeBonus, calcPassiveCostReduction,
+         applyConditionals } from './effects.js'; // ← 追加
 // ============ 盤面クローン ============
 export function cloneBoard(board) {
   return {
@@ -143,6 +144,9 @@ board[side].forEach(col => col.forEach(u => {
     u.actCount = 0;
     u.stunned = false;
   }
+  // 条件付き効果を再評価
+applyConditionals(state, side);
+return state;
 }));
   
   // 発電機コスト
@@ -165,6 +169,8 @@ board[side].forEach(col => col.forEach(u => {
   const upd = side === "blue"
     ? { playerHand: hand, playerDeck: deck, playerCost: cost }
     : { aiHand: hand, aiDeck: deck, aiCost: cost };
+  applyConditionals(state, side);
+return state;
   return { ...state, board, log, ...upd };
 }
 
@@ -211,6 +217,8 @@ board[side][col].splice(Math.min(insertIdx, board[side][col].length), 0, unit);
     : { aiHand: hand, aiCost: cost - finalCost, aiGrave: grave };
 
   const ns = { ...state, board, log, ...costUpd };
+  applyConditionals(ns, side);
+return ns;
   return checkVictory(board, state.turn).over ? { ...ns, gameOver: checkVictory(board, state.turn).winner } : ns;
 }
 
@@ -271,6 +279,8 @@ if (has2act && attacker.actCount < 2) {
 
   const vc = checkVictory(board, state.turn);
   if (vc.over && !ns.gameOver) ns.gameOver = vc.winner;
+  applyConditionals(ns, active);
+return ns;
   return ns;
 }
 
@@ -325,5 +335,7 @@ ns = { ...ns, ...costUpd };
   ns = { ...ns, ...costUpd };
   const vc = checkVictory(board, state.turn);
   if (vc.over && !ns.gameOver) ns.gameOver = vc.winner;
+  applyConditionals(ns, side);
+return ns;
   return ns;
 }
