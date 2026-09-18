@@ -280,7 +280,7 @@ if (has2act && attacker.actCount < 2) {
 
   const vc = checkVictory(board, state.turn);
   if (vc.over && !ns.gameOver) ns.gameOver = vc.winner;
-  applyConditionals(ns, active);
+  applyConditionals(ns, side);
 return ns;
 }
 
