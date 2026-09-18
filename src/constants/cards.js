@@ -139,7 +139,7 @@ export const INITIAL_CARDS = [
     { effect:{ trigger:"activate", target:"random_enemy_multi", action:"damage_multi", amount:3, times:3 },
       desc:"ランダムに3回選び選ばれた回数×3ダメージ" }),
 //トランプtrump属性
-card(1001,  "スペードのA",        91, 1,  1, "1.1", "unit",     "trump", {
+card(1001,  "スペードのA",        1, 1,  1, "1.1", "unit",     "trump", {
   conditional: {
     condition: { type: "cost_gte", value: 10 },
     effect:    { type: "atk_up",  value: 10 },
@@ -160,17 +160,17 @@ card(1104,  "火縄銃",        3, 3,  4, "1.3", "unit",     "none",{ tags:["速
 card(1109,  "狐",        9, 7,  2, "３.3", "unit",     "none",{ tags:["先制","２回行動"] }),
 //ヨーロッパ
   // 同行にEU属性3体
-card(1201, "盾兵", 92, 5, 1, "1.1", "unit", "eu", {
+card(1201, "盾兵", 2, 5, 1, "1.1", "unit", "eu", {
   conditional: {
     condition: { type: "row_attr", value: "eu", count: 3 },
     effect:    { type: "tag_add",  value: "タンク" },},
   desc: "同列にヨーロッパ属性3体でタンク"}),
-  card(1202, "弓兵", 92, 2, 2, "1.2", "unit", "eu", {
+  card(1202, "弓兵", 2, 2, 2, "1.2", "unit", "eu", {
   conditional: {
     condition: { type: "row_attr", value: "eu", count: 3 },
     effect:    { type: "atk_up",  value: 1 },},
   desc: "同列にヨーロッパ属性3体で縦射程+1"}),
-  card(1203, "馬兵", 94, 4, 3, "1.1", "unit", "eu", {
+  card(1203, "馬兵", 4, 4, 3, "1.1", "unit", "eu", {
   conditional: {
     condition: { type: "row_attr", value: "eu", count: 3 },
     effect:    { type: "atk_up",  value: 2 },},
