@@ -310,14 +310,22 @@ function checkCondition(cond, ctx) {
 
 function applyCondEffect(effect, unit) {
   if (!effect) return;
-  switch (effect.type) {
-    case "atk_up":    unit.atk    += effect.value; break;
-    case "vrange_up": unit.vRange += effect.value; break;
-    case "hp_up":     unit.hp     = Math.min(unit.maxHp, unit.hp + effect.value); break;
-    case "tag_add":
-      if (!unit.tags.includes(effect.value)) unit.tags.push(effect.value);
-      break;
-  }
+
+  // 単体オブジェクトでも配列でも処理できるように正規化
+  const effectList = Array.isArray(effect) ? effect : [effect];
+
+  effectList.forEach(eff => {
+    switch (eff.type) {
+      case "atk_up":    unit.atk    += eff.value; break;
+      case "vrange_up": unit.vRange += eff.value; break;
+      case "hrange_up": unit.hRange += eff.value; break;
+      case "drange_up": unit.dRange += eff.value; break;
+      case "hp_up":     unit.hp     = Math.min(unit.maxHp, unit.hp + eff.value); break;
+      case "tag_add":
+        if (!unit.tags.includes(eff.value)) unit.tags.push(eff.value);
+        break;
+    }
+  });
 }
 
 // 全ユニットの条件付き効果を再評価
@@ -344,6 +352,8 @@ export function applyConditionals(state, side) {
         // ベース値にリセット
         unit.atk    = unit.baseAtk ?? unit.atk;
         unit.vRange = unit.baseVRange ?? unit.vRange ?? 1;
+        unit.hRange = unit.baseHRange ?? unit.hRange ?? 1;
+        unit.dRange = unit.baseDRange ?? unit.dRange ?? 1;
         unit.tags   = [...(unit.baseTags || [])];
 
         // 配列形式と単体形式の両方に対応
