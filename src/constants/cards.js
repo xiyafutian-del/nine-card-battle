@@ -17,6 +17,8 @@ function card(id, name, cost, hp, atk, range, type, attr, extra = {}) {
     type: TYPES[type.toUpperCase()] || type,
     attr: ATTRS[attr.toUpperCase()] || attr,
     effect: extra.effect || null,
+    conditional: extra.conditional || null, // ← ここを追加！(条件付き効果を保持)
+    targetType: extra.targetType || null,   // ← ここを追加！(ターゲットタイプを保持)
     tags: extra.tags || [],
     desc: extra.desc || "",
   };
