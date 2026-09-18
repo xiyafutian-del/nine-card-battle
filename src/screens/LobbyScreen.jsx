@@ -17,7 +17,7 @@ export function LobbyScreen({
         <h1 className="text-center text-3xl font-extrabold tracking-widest mb-1">9 CARD</h1>
         <div className="h-px bg-black mb-4"/>
 
-        <div className="space-y-3">
+        <div className="space-y-5">
           <button onClick={() => onStart("pve")} className="w-full bg-white hover:bg-gray-100 font-bold py-3 border border-black tracking-wide">PVE対戦</button>
           <button onClick={() => onStart("solo")} className="w-full bg-white hover:bg-gray-100 font-bold py-3 border border-black tracking-wide">1人回し</button>
 
@@ -101,7 +101,7 @@ export function LobbyScreen({
           <span>ルール</span><span>{helpOpen ? "▲" : "▼"}</span>
         </button>
         {helpOpen && (
-          <div className="text-xs text-gray-300 leading-relaxed space-y-1.5 mt-2 border border-gray-300 p-3">
+          <div className="text-xs text-gray-600 leading-relaxed space-y-1.5 mt-2 border border-gray-600 p-3">
             <p>盤面は自陣3×3。コア（HP10）が中央前列に配置、破壊されたら負け。</p>
             <p><b>勝利条件</b>：コア破壊</p>
             <p><b>デッキ</b>：15枚のカードを選択し自由に組む。同名制限無し。</p>
