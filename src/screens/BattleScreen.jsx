@@ -17,9 +17,9 @@ export function BattleScreen({
     ? (active === "blue" ? battle.playerHand : battle.aiHand)
     : battle.playerHand;
   const handCost = active === "blue" ? battle.playerCost : battle.aiCost;
-  const handDisabled = (mode === "pve" && active === "red") ||
-                       (mode === "pvp" && pvpRole === "guest" && active === "blue") ||
-                       (mode === "pvp" && pvpRole === "host" && active === "red");
+ const myColor = pvpRole === "host" ? "blue" : pvpRole === "guest" ? "red" : "blue";
+const handDisabled = (mode === "pve" && active === "red") ||
+                     (mode === "pvp" && active !== myColor);
   const turn1block = turn === 1 && active === firstPlayer;
   const isGameOver = gameOver !== null && gameOver !== undefined;
   const gen = active === "blue" ? battle.playerGenerator : battle.aiGenerator;
