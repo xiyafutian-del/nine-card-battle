@@ -168,23 +168,23 @@ card(1201, "盾兵", 2, 5, 1, "1.1", "unit", "eu", {
   conditional: {
     condition: { type: "row_attr", value: "eu", count: 3 },
     effect:    { type: "tag_add",  value: "タンク" },},
-  desc: "同列にヨーロッパ属性3体でタンク"}),
+  desc: "同行にヨーロッパ属性3体でタンク"}),
   card(1202, "弓兵", 2, 2, 2, "1.2", "unit", "eu", {
   conditional: {
     condition: { type: "row_attr", value: "eu", count: 3 },
     effect:    { type: "vrange_up",  value: 1 },},
-  desc: "同列にヨーロッパ属性3体で縦射程+1"}),
+  desc: "同行にヨーロッパ属性3体で縦射程+1"}),
   card(1203, "槍兵", 3, 3, 2, "1.2", "unit", "eu", {
   conditional: {
-    condition: { type: "col_attr", value: "eu", count: 3 },
+    condition: { type: "col_attr", value: "eu", count: 2 },
     effect:    { type: "atk_up",  value: 2 },},
-  desc: "同列にヨーロッパ属性3体で攻撃+2"}),
-  card(1204, "カタパルト", 6, 3, 2, "1.2", "unit", "eu", {
+  desc: "同列にヨーロッパ属性2体で攻撃+2"}),
+  card(1204, "カタパルト", 6, 5, 4, "3.2", "unit", "eu",{ tags:["反動"] }, {
   conditional: {
     condition: { type: "col_attr", value: "eu", count: 3 },
     effect:    { type: "vrange_up",  value: 2 },},
   desc: "同列にヨーロッパ属性3体で縦射程+1"}),
-  card(1205, "チャリオット", 93, 3, 2, "1.2", "unit", "eu", {
+  card(1205, "チャリオット", 9, 9, 2, "1.1", "unit", "eu",{ tags:["先制","2回行動"] }, {
   conditional: {
     condition: { type: "col_attr", value: "eu", count: 3 },
     effect:    { type: "atk_up",  value: 2 },},
@@ -220,7 +220,7 @@ card(1201, "盾兵", 2, 5, 1, "1.1", "unit", "eu", {
   card(3101, "シダンゴ虫",       2, 5, 1, "1.1", "unit", "bug"),
   card(3102, "羽葉蝶",       3, 2, 2, "3.1", "unit", "bug"),
   card(3103, "点灯虫",       4, 1, 3, "d2", "unit", "bug",{ tags:["タンク"] }),
-  card(54, "食虫木",       4, 3, 3, "1.1", "unit", "grass",
+  card(54, "食虫木",       4, 2, 3, "1.1", "unit", "grass",
     { effect:{ trigger:"on_attack", target:"self", action:"heal", amount:"damage_dealt" },
       desc:"攻撃時与ダメージ分HP回復" }),
   card(55, "わたげツリー", 6, 5, 2, "3.2", "unit", "grass",
