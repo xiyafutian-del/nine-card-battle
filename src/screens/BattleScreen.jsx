@@ -85,7 +85,6 @@ const handDisabled = (mode === "pve" && active === "red") ||
   }
 
   // PVP時の表示: 自分は常に下側
-  const myColor = pvpRole === "host" ? "blue" : pvpRole === "guest" ? "red" : "blue";
   const myHand = mode === "pvp"
     ? (myColor === "blue" ? battle.playerHand : battle.aiHand)
     : handArr;
