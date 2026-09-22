@@ -2,30 +2,10 @@ import { useRef, useEffect } from 'react';
 import { drawMetalFrame } from '../skins/metalTexture.js';
 import { drawGemFrame } from '../skins/gemTexture.js';
 
-// フレームのキャッシュ（seed+サイズ → canvas）
-const frameCache = new Map();
+// フレーム帯の厚さ（カード幅に対するpx）
+// 既存の黒枠(1.5px相当) + 2px = 約3〜4px
+const FRAME_PX = 4;
 
-function getFrameCanvas(skin, w, h) {
-  const key = `${skin.type}-${skin.seed}-${w}-${h}`;
-  if (frameCache.has(key)) return frameCache.get(key);
-
-  const canvas = document.createElement("canvas");
-  const dpr = window.devicePixelRatio || 2;
-  canvas.width  = Math.round(w * dpr);
-  canvas.height = Math.round(h * dpr);
-
-  if (skin.type === "metal") drawMetalFrame(canvas, skin.seed);
-  else if (skin.type === "gem") drawGemFrame(canvas, skin.seed);
-
-  frameCache.set(key, canvas);
-  return canvas;
-}
-
-// フレーム帯の厚さ（カード幅に対する割合）
-const FRAME_RATIO = 0.10;
-
-// フレームCanvasコンポーネント
-// カードの外周のみにテクスチャを表示し、中央は透明
 export function SkinFrame({ skin, w, h }) {
   const ref = useRef(null);
 
@@ -36,28 +16,30 @@ export function SkinFrame({ skin, w, h }) {
     const dpr = window.devicePixelRatio || 2;
     const W = Math.round(w * dpr);
     const H = Math.round(h * dpr);
+    const F = Math.round(FRAME_PX * dpr); // フレーム帯の厚さ(px)
+
     el.width  = W;
     el.height = H;
     el.style.width  = w + "px";
     el.style.height = h + "px";
 
     const ctx = el.getContext("2d");
+    ctx.clearRect(0, 0, W, H);
 
-    // テクスチャ全面描画
-    if (skin.type === "metal") drawMetalFrame(el, skin.seed);
-    else if (skin.type === "gem") drawGemFrame(el, skin.seed);
+    // 枠の4辺だけに描画するクリップパスを設定
+    ctx.save();
+    const path = new Path2D();
+    // 外側
+    path.rect(0, 0, W, H);
+    // 内側（くり抜き）
+    path.rect(F, F, W - F*2, H - F*2);
+    ctx.clip(path, "evenodd");
 
-    // 中央を透明に抜く
-    const fx = Math.round(W * FRAME_RATIO);
-    const fy = Math.round(H * FRAME_RATIO);
-    ctx.clearRect(fx, fy, W - fx*2, H - fy*2);
+    // テクスチャを全面描画（クリップで枠のみ見える）
+    if (skin.type === "metal") drawMetalFrame(el, skin.seed, W, H, ctx);
+    else if (skin.type === "gem") drawGemFrame(el, skin.seed, W, H, ctx);
 
-    // 内側の縁取り
-    ctx.strokeStyle = "rgba(0,0,0,0.3)";
-    ctx.lineWidth = Math.max(1, dpr * 0.8);
-    ctx.beginPath();
-    ctx.rect(fx, fy, W - fx*2, H - fy*2);
-    ctx.stroke();
+    ctx.restore();
 
   }, [skin, w, h]);
 
@@ -72,27 +54,54 @@ export function SkinFrame({ skin, w, h }) {
   );
 }
 
-// スキンのプレビュー表示（所持一覧・ガチャ結果）
+// プレビュー（枠のみ表示）
 export function SkinPreview({ skin, w = 59, h = 86 }) {
   const ref = useRef(null);
 
   useEffect(() => {
     const el = ref.current;
     if (!el || !skin) return;
+
     const dpr = window.devicePixelRatio || 2;
-    el.width  = Math.round(w * dpr);
-    el.height = Math.round(h * dpr);
+    const W = Math.round(w * dpr);
+    const H = Math.round(h * dpr);
+    const F = Math.round(FRAME_PX * dpr * 2.5); // プレビューは少し太め
+
+    el.width  = W;
+    el.height = H;
     el.style.width  = w + "px";
     el.style.height = h + "px";
-    if (skin.type === "metal") drawMetalFrame(el, skin.seed);
-    else if (skin.type === "gem") drawGemFrame(el, skin.seed);
+
+    const ctx = el.getContext("2d");
+    ctx.clearRect(0, 0, W, H);
+
+    // 背景（白）
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, W, H);
+
+    // 枠のみクリップ
+    ctx.save();
+    const path = new Path2D();
+    path.rect(0, 0, W, H);
+    path.rect(F, F, W - F*2, H - F*2);
+    ctx.clip(path, "evenodd");
+
+    if (skin.type === "metal") drawMetalFrame(el, skin.seed, W, H, ctx);
+    else if (skin.type === "gem") drawGemFrame(el, skin.seed, W, H, ctx);
+
+    ctx.restore();
+
+    // 内側の黒枠
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = dpr * 0.8;
+    ctx.strokeRect(F, F, W - F*2, H - F*2);
+
   }, [skin, w, h]);
 
   return (
     <canvas
       ref={ref}
-      className="border border-black"
-      style={{ display:"block", borderRadius:"2px" }}
+      style={{ display:"block", border:"1px solid black", borderRadius:"2px" }}
     />
   );
 }
