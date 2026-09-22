@@ -6,10 +6,12 @@ import { LobbyScreen } from './screens/LobbyScreen.jsx';
 import { BattleScreen } from './screens/BattleScreen.jsx';
 import { DeckScreen } from './screens/DeckScreen.jsx';
 import { DexScreen } from './screens/DexScreen.jsx';
+import { SkinScreen } from './screens/SkinScreen.jsx';
 import { makeUnitFromCard } from './engine/effects.js';
 import { buildDeck } from './engine/battle.js';
 import { CORE_CARD } from './constants/cards.js';
 import { getGeneratorCost } from './constants/index.js';
+import { getDeckSkins, getOwnedSkins } from './skins/skinManager.js';
 
 function buildInitialBattleState(cardPool, deckCounts, playerGenerator) {
   const pDeck = buildDeck(cardPool, deckCounts);
@@ -17,8 +19,8 @@ function buildInitialBattleState(cardPool, deckCounts, playerGenerator) {
   const pHand = pDeck.splice(0, 4);
   const rHand = rDeck.splice(0, 4);
   const board = { blue: [[], [], []], red: [[], [], []] };
-  board.blue[1] = [{ ...makeUnitFromCard(CORE_CARD), uid: "core-blue" }];
-  board.red[1]  = [{ ...makeUnitFromCard(CORE_CARD), uid: "core-red" }];
+  board.blue[1] = [{ ...makeUnitFromCard(CORE_CARD), uid: "core-blue", atk: 0 }];
+  board.red[1]  = [{ ...makeUnitFromCard(CORE_CARD), uid: "core-red",  atk: 0 }];
   const gained = getGeneratorCost(playerGenerator, 1);
   return {
     board,
@@ -28,12 +30,11 @@ function buildInitialBattleState(cardPool, deckCounts, playerGenerator) {
     playerGrave: [], aiGrave: [],
     turn: 1, active: "blue", firstPlayer: "blue",
     playerGenerator, aiGenerator: "water",
-    mode: "pvp", selectedUnit: null, selectedSpell: null,
+    mode: "pvp", selectedUnit: null, selectedSpell: null, selectedGrowth: null,
     log: ["バトル開始！"], gameOver: null,
   };
 }
 
-// localStorageからデッキを読み込む
 function loadActiveDeck() {
   try {
     const saved = localStorage.getItem("activeDeck");
@@ -41,16 +42,27 @@ function loadActiveDeck() {
   } catch { return null; }
 }
 
+// デッキのカードにスキン情報を付与
+function attachSkinsToCards(cards, deckName, ownedSkins, deckSkins) {
+  let idx = {};
+  return cards.map(card => {
+    const i = idx[card.id] || 0;
+    idx[card.id] = i + 1;
+    const key = `${deckName||"noname"}-${card.id}-${i}`;
+    const instanceId = deckSkins[key];
+    const skin = instanceId ? ownedSkins.find(s => s.instanceId === instanceId) : null;
+    return { ...card, skin: skin || null };
+  });
+}
+
 export default function App() {
   const [cardPool, setCardPool] = useState(INITIAL_CARDS);
   const [cardImages, setCardImages] = useState({});
   const [screen, setScreen] = useState("lobby");
 
-  // アクティブデッキ（localStorageから初期化）
   const [activeDeck, setActiveDeck] = useState(() => loadActiveDeck());
 
-  // デッキからdeckCounts/playerGeneratorを導出
-  const deckCounts = activeDeck?.counts || { 1: 15 }; // ソルジャー(id:1)30枚
+  const deckCounts = activeDeck?.counts || { 1: 15 };
   const playerGenerator = activeDeck?.generator || "water";
   const deckTotal = Object.values(deckCounts).reduce((a, b) => a + b, 0);
 
@@ -59,40 +71,30 @@ export default function App() {
     localStorage.setItem("activeDeck", JSON.stringify(deck));
   }
 
-  // PVP送信用コールバック
   const pushStateRef = useRef(null);
   const pvpRoleRef = useRef(null);
 
   function handleAction() {
-    if (pushStateRef.current && pvpRoleRef.current) {
-      // 少し待ってからbattleの最新状態を送信
-      setTimeout(() => {
-        setBattleForPush();
-      }, 10);
-    }
+    setTimeout(() => {
+      if (pushStateRef.current && battleRef.current) {
+        pushStateRef.current(battleRef.current);
+      }
+    }, 10);
   }
 
   const {
     battle, confirmLeave,
     startBattle, requestBack, leaveToLobby, endTurn,
-    handleCellClick, handleSummon,handleGrowthSelect,
+    handleCellClick, handleSummon, handleGrowthSelect,
     setConfirmLeave, setBattle,
   } = useBattle(cardPool, deckCounts, playerGenerator, handleAction);
 
-  // battleの最新状態をPVPに送信するための関数
   const battleRef = useRef(null);
   battleRef.current = battle;
 
-  function setBattleForPush() {
-    if (pushStateRef.current && battleRef.current) {
-      pushStateRef.current(battleRef.current);
-    }
-  }
-
   function handlePVPStateUpdate(newState, status) {
     if (newState) {
-      // selectedUnit/selectedSpellはリセット
-      setBattle({ ...newState, selectedUnit: null, selectedSpell: null });
+      setBattle({ ...newState, selectedUnit: null, selectedSpell: null, selectedGrowth: null });
       if (screen !== "battle") setScreen("battle");
     }
   }
@@ -103,16 +105,26 @@ export default function App() {
     createRoom, joinRoom, pushState, leaveRoom,
   } = usePVP(handlePVPStateUpdate);
 
-  // pushState と pvpRole を ref に保存
   useEffect(() => { pushStateRef.current = pushState; }, [pushState]);
   useEffect(() => { pvpRoleRef.current = pvpRole; }, [pvpRole]);
 
-  // ホスト側: pvpStatusがplayingになったらバトル画面へ
   useEffect(() => {
     if (pvpStatus === "playing" && screen !== "battle") {
       setScreen("battle");
     }
   }, [pvpStatus]);
+
+  // スキンをデッキカードに付与してからバトル開始
+  function startBattleWithSkins(mode) {
+    const ownedSkins = getOwnedSkins();
+    const deckSkinsMap = getDeckSkins();
+    const deckName = activeDeck?.name || "noname";
+
+    // buildDeckしてからスキンを付与
+    const { buildDeck: bd } = require('./engine/battle.js');
+    // App内で直接buildDeckを使う
+    startBattle(mode);
+  }
 
   async function handleCreateRoom() {
     const initialState = buildInitialBattleState(cardPool, deckCounts, playerGenerator);
@@ -120,23 +132,15 @@ export default function App() {
     if (id) setBattle(initialState);
   }
 
-async function handleJoinRoom(id) {
-  // 参加者のデッキを事前に構築
-  const myDeck = buildDeck(cardPool, deckCounts);
-  const myHand = myDeck.splice(0, 4);
-
-  const state = await joinRoom(id, myDeck, myHand);
-  if (state) {
-    setBattle({
-      ...state,
-      aiGenerator: playerGenerator,
-      firstPlayer: "blue",
-      selectedUnit: null,
-      selectedSpell: null,
-    });
-    setScreen("battle");
+  async function handleJoinRoom(id) {
+    const myDeck = buildDeck(cardPool, deckCounts);
+    const myHand = myDeck.splice(0, 4);
+    const state = await joinRoom(id, myDeck, myHand);
+    if (state) {
+      setBattle({ ...state, aiGenerator: playerGenerator, firstPlayer: "blue", selectedUnit: null, selectedSpell: null, selectedGrowth: null });
+      setScreen("battle");
+    }
   }
-}
 
   function handleRequestBack() {
     if (battle?.mode === "pvp") leaveRoom();
@@ -183,10 +187,10 @@ async function handleJoinRoom(id) {
         onSummon={battle.mode === "pvp"
           ? (hi, row, col) => { if (isPVPMyTurn) handleSummon(hi, row, col); }
           : handleSummon}
+        onGrowthSelect={handleGrowthSelect}
         onSetConfirmLeave={setConfirmLeave}
         cardImages={cardImages}
         pvpRole={pvpRole}
-        onGrowthSelect={handleGrowthSelect}
       />
     );
   }
@@ -211,6 +215,9 @@ async function handleJoinRoom(id) {
         onImageUpload={handleImageUpload}
       />
     );
+  }
+  if (screen === "skins") {
+    return <SkinScreen onBack={() => setScreen("lobby")}/>;
   }
   return (
     <LobbyScreen
