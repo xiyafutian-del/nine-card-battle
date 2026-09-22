@@ -1,5 +1,6 @@
 import { ATTR_LABELS, TYPES } from '../constants/index.js';
 import { useRef, useEffect, useState } from 'react';
+import { SkinFrame } from './SkinFrame.jsx';
 
 export const CARD_W = 59;
 export const CARD_H = 86;
@@ -19,14 +20,11 @@ function FitText({ text, base, min }) {
   return <span style={{ fontSize:`${size}px`, lineHeight:1.0 }}>{text}</span>;
 }
 
-// 回転角度を計算
-function getRotation(unit) {
-  if (!unit) return 0;
-  const deg = unit.rotateDeg || 0;
-  return deg;
-}
-
-export function CardLayout({ card, image, extraBottom, dimmed=false, w=CARD_W, h=CARD_H, rotateDeg=0 }) {
+export function CardLayout({
+  card, image, extraBottom,
+  dimmed=false, w=CARD_W, h=CARD_H,
+  rotateDeg=0, skin=null,
+}) {
   const isSpellMagic = card.type === TYPES.SPELL || card.type === TYPES.MAGIC;
   const isCore = card.isCore || card.id === "core";
 
@@ -47,13 +45,14 @@ export function CardLayout({ card, image, extraBottom, dimmed=false, w=CARD_W, h
         <div className="flex-1 flex items-center justify-center">
           <span className="font-bold" style={{ fontSize:`${18*scale}px` }}>{card.hp}</span>
         </div>
+        {skin && <SkinFrame skin={skin} w={w} h={h}/>}
       </div>
     );
   }
 
-  const costW = Math.round(w * 0.30 * 0.7);
-  const nameH = Math.round(w * 0.30 * 0.7);
-  const illH  = Math.round(h * 0.36);
+  const costW  = Math.round(w * 0.30 * 0.7);
+  const nameH  = Math.round(w * 0.30 * 0.7);
+  const illH   = Math.round(h * 0.36);
   const statsH = Math.round(h * 0.13);
   const hasTags = card.tags?.length > 0;
   const tagsH  = hasTags ? Math.round(h * 0.10) : 0;
@@ -104,7 +103,7 @@ export function CardLayout({ card, image, extraBottom, dimmed=false, w=CARD_W, h
         </div>
       )}
 
-      {/* tagsバッジ（枠なし） */}
+      {/* タグ */}
       {hasTags && (
         <div className="flex flex-wrap flex-shrink-0"
           style={{ height:`${tagsH}px`, padding:`0 ${3*scale}px`, alignItems:"center", gap:`${scale}px` }}>
@@ -114,7 +113,7 @@ export function CardLayout({ card, image, extraBottom, dimmed=false, w=CARD_W, h
         </div>
       )}
 
-      {/* 効果テキスト（上詰め・行間小さめ） */}
+      {/* 効果テキスト */}
       <div className="overflow-hidden" style={{ padding:`${1*scale}px ${3*scale}px`, flex:"1 1 0" }}>
         <span style={{ fontSize:`${4.8*scale}px`, lineHeight:1.15, display:"block" }}>
           {card.desc || ""}
@@ -122,16 +121,18 @@ export function CardLayout({ card, image, extraBottom, dimmed=false, w=CARD_W, h
       </div>
 
       {extraBottom}
+
+      {/* フレームスキン */}
+      {skin && <SkinFrame skin={skin} w={w} h={h}/>}
     </div>
   );
 }
 
-export function CardFace({ card, image }) {
-  return <CardLayout card={card} image={image} w={CARD_W} h={CARD_H}/>;
+export function CardFace({ card, image, skin=null }) {
+  return <CardLayout card={card} image={image} skin={skin} w={CARD_W} h={CARD_H}/>;
 }
 
 export function UnitCell({ unit, pushed }) {
-  const deg = unit.rotateDeg || 0;
   return (
     <div style={{
       width:`${CARD_W}px`, height:`${CARD_H}px`,
@@ -147,14 +148,15 @@ export function UnitCell({ unit, pushed }) {
           desc: unit.desc || "",
         }}
         image={unit.image}
+        skin={unit.skin || null}
         w={CARD_W} h={CARD_H}
-        rotateDeg={deg}
+        rotateDeg={unit.rotateDeg || 0}
       />
     </div>
   );
 }
 
-export function CardGrid({ card, image, count, onInc, onDec }) {
+export function CardGrid({ card, image, count, onInc, onDec, skin=null }) {
   const ref = useRef(null);
   const [w, setW] = useState(70);
 
@@ -174,12 +176,10 @@ export function CardGrid({ card, image, count, onInc, onDec }) {
 
   return (
     <div ref={ref} style={{ width:"100%" }}>
-      {/* カード本体 */}
-      <CardLayout card={card} image={image} w={w} h={h}/>
-      {/* ＋－はカードの外・下に表示 */}
+      <CardLayout card={card} image={image} skin={skin} w={w} h={h}/>
       {onInc && (
         <div className="flex items-center justify-between"
-          style={{ padding:`${2*scale}px ${2*scale}px`, borderTop:"none" }}>
+          style={{ padding:`${2*scale}px` }}>
           <button onClick={onDec}
             className="border border-black font-bold flex items-center justify-center bg-white"
             style={{ width:`${16*scale}px`, height:`${16*scale}px`, fontSize:`${8*scale}px` }}>－</button>
@@ -191,4 +191,4 @@ export function CardGrid({ card, image, count, onInc, onDec }) {
       )}
     </div>
   );
-}
+          }
