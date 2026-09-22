@@ -93,6 +93,11 @@ export function LobbyScreen({
             <button onClick={() => onNav("dex")} className="bg-white hover:bg-gray-100 font-semibold py-3 border border-black">
               カード図鑑
             </button>
+            <button onClick={() => onNav("skins")}
+  className="w-full bg-white hover:bg-gray-100 font-bold py-3 border border-black tracking-wide">
+  フレームスキン
+  <div className="text-xs text-gray-400">ガチャ・スキン設定</div>
+</button>
           </div>
         </div>
 
