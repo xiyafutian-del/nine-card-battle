@@ -265,6 +265,7 @@ export function makeUnitFromCard(card) {
     baseVRange: card.vRange || 1,
     baseTags: card.tags || [],
     conditional: card.conditional || null,
+    skin: card.skin || null,
     _k: card._k || nextKey(),
   };
 }
