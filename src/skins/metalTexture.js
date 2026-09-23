@@ -9,13 +9,13 @@ function mulberry32(seed) {
 }
 
 export const METAL_TYPES = [
-  { id: "iron",       name: "自然鉄",       rarity: 50, hue: 210, sat: 10, light: 40, gloss: 0.4 },
-  { id: "copper",     name: "自然銅",       rarity: 30, hue: 22,  sat: 70, light: 48, gloss: 0.65 },
-  { id: "silver",     name: "自然銀",       rarity: 10, hue: 200, sat: 10, light: 82, gloss: 0.88 },
-  { id: "gold",       name: "自然金",       rarity: 5,  hue: 45,  sat: 90, light: 60, gloss: 0.95 },
-  { id: "platinum",   name: "自然白金",     rarity: 2,  hue: 200, sat: 5,  light: 88, gloss: 0.98 },
-  { id: "meteorite",  name: "隕鉄",         rarity: 1,  hue: 235, sat: 25, light: 28, gloss: 0.7 },
-  { id: "orichalcum", name: "オリハルコン", rarity: 1,  hue: 160, sat: 80, light: 52, gloss: 0.92 },
+  { id: "iron",       name: "自然鉄",       rarity: 50, hue: 210, sat: 12, light: 42, gloss: 0.45 },
+  { id: "copper",     name: "自然銅",       rarity: 30, hue: 22,  sat: 75, light: 50, gloss: 0.70 },
+  { id: "silver",     name: "自然銀",       rarity: 10, hue: 200, sat: 12, light: 84, gloss: 0.90 },
+  { id: "gold",       name: "自然金",       rarity: 5,  hue: 45,  sat: 92, light: 62, gloss: 0.96 },
+  { id: "platinum",   name: "自然白金",     rarity: 2,  hue: 200, sat: 6,  light: 90, gloss: 0.98 },
+  { id: "meteorite",  name: "隕鉄",         rarity: 1,  hue: 235, sat: 28, light: 30, gloss: 0.75 },
+  { id: "orichalcum", name: "オリハルコン", rarity: 1,  hue: 160, sat: 85, light: 55, gloss: 0.94 },
 ];
 
 export function rollMetalType(rng) {
@@ -44,12 +44,37 @@ function hslToRgb(h, s, l) {
   return [Math.round(r*255), Math.round(g*255), Math.round(b*255)];
 }
 
-// 鉱石塊の有機的な輪郭を計算（高調波合成）
-function getOrganicRadius(angle, baseRadius, seedOffset) {
-  const n1 = Math.sin(angle * 3 + seedOffset) * 0.3;
-  const n2 = Math.cos(angle * 7 - seedOffset * 0.5) * 0.18;
-  const n3 = Math.sin(angle * 13 + seedOffset * 2) * 0.08;
-  return baseRadius * Math.max(0.2, 1 + n1 + n2 + n3);
+// 疑似2Dノイズ関数
+function pseudoNoise(x, y, seed) {
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const xf = x - xi, yf = y - yi;
+  const h = (a, b) => mulberry32(seed + a * 157 + b * 311)();
+  
+  // バイリニア補間
+  const n00 = h(xi, yi),     n10 = h(xi + 1, yi);
+  const n01 = h(xi, yi + 1), n11 = h(xi + 1, yi + 1);
+  const u = xf * xf * (3 - 2 * xf);
+  const v = yf * yf * (3 - 2 * yf);
+  return (n00 * (1 - u) + n10 * u) * (1 - v) + (n01 * (1 - u) + n11 * u) * v;
+}
+
+// 多層ノイズ（FBM + Domain Warping）によるダイナミックな岩の高さマップ
+function getRockHeight(x, y, seed) {
+  // Domain Warp (座標の歪み)
+  const wx = pseudoNoise(x * 0.015, y * 0.015, seed) * 40;
+  const wy = pseudoNoise(x * 0.015 + 5.2, y * 0.015 + 1.3, seed) * 40;
+  
+  const nx = x + wx;
+  const ny = y + wy;
+
+  // FBM (Fractal Brownian Motion)
+  let h = 0;
+  h += pseudoNoise(nx * 0.02, ny * 0.02, seed) * 0.50;
+  h += pseudoNoise(nx * 0.05, ny * 0.05, seed + 1) * 0.30;
+  h += pseudoNoise(nx * 0.12, ny * 0.12, seed + 2) * 0.20;
+  
+  // 凹凸を鋭くする（亀裂感）
+  return Math.pow(h, 1.4);
 }
 
 export function drawMetalFrame(canvas, seed, W, H, ctx) {
@@ -60,109 +85,174 @@ export function drawMetalFrame(canvas, seed, W, H, ctx) {
   const rng = mulberry32(seed);
   const rngNugget = mulberry32(seed ^ 0xdeadbeef);
 
-  // 天文学的確率（全フレーム鉱床）判定 ※テスト用15%
-  const isPureNugget = rngNugget() < 0.15;
+  const isPureNugget = rngNugget() < 0.15; // テスト用15%
 
-  // ── 1. カード内の各所に配置される「鉱石塊（ナゲット）」を個別抽選 ──
-  const nuggetCount = isPureNugget ? 35 : Math.floor(6 + rng() * 10);
+  // ── 1. 不規則な個別の結晶・鉱床群の生成 ──
+  const nuggetCount = isPureNugget ? 40 : Math.floor(8 + rng() * 12);
   const nuggets = [];
 
   for (let i = 0; i < nuggetCount; i++) {
-    // 場所ごとに独立して鉱石の種類をロール（完全ランダム分布）
     const metal = rollMetalType(rng);
     const cx = rng() * W;
     const cy = rng() * H;
-    const radius = isPureNugget ? (25 + rng() * 45) : (8 + rng() * 22);
-    const seedOffset = rng() * 1000;
+    const size = isPureNugget ? (30 + rng() * 50) : (10 + rng() * 28);
+    // 結晶タイプ (0: 方解石状/多面体, 1: 不規則破片, 2: 細長い鉱脈)
+    const crystalType = Math.floor(rng() * 3);
+    const angle = rng() * Math.PI * 2;
+    const nSeed = Math.floor(rng() * 10000);
 
-    nuggets.push({ cx, cy, radius, metal, seedOffset });
+    nuggets.push({ cx, cy, size, metal, crystalType, angle, nSeed });
   }
 
-  // ── 2. ピクセル単位の3Dライティング描画 ──
+  // ── 2. ピクセル単位の高さ比較シェーディング ──
   const imgData = ctx.createImageData(W, H);
   const data = imgData.data;
 
-  // 光源ベクトル（左上奥から手前照射）
-  const lx = -0.45, ly = -0.45, lz = 0.77;
-  // ハーフベクトル（Blinn-Phong鏡面反射用）
-  const hx = -0.27, hy = -0.27, hz = 0.92;
+  // 光源（左上奥）
+  const lx = -0.5, ly = -0.5, lz = 0.707;
+  // ハーフベクトル（ハイライト用）
+  const hx = -0.3, hy = -0.3, hz = 0.90;
 
+  // 各ピクセルの岩高さマップを事前評価するため、1ピクセル隣の差分（勾配）で法線を計算
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const idx = (y * W + x) * 4;
 
-      // 岩肌のベースカラー（泥灰岩・玄武岩風の自然なノイズ）
-      const rockGrain = (mulberry32(seed + x * 131 + y * 257)() - 0.5) * 16;
-      const rockL = Math.max(12, Math.min(45, 24 + rockGrain));
-      const [rr, rg, rb] = hslToRgb(210, 6, rockL);
+      // 岩の高さ
+      const rockH = getRockHeight(x, y, seed);
 
-      let pixelR = rr, pixelG = rg, pixelB = rb;
-      let highestMetalGloss = -1;
+      // 各鉱石の高さ（最も高い鉱石を採用）
+      let maxMetalH = 0;
+      let topNugget = null;
+      let facetNormal = { nx: 0, ny: 0, nz: 1 };
 
-      // 各ピクセルで最も近い/重なっている鉱石塊を探索
       for (const nug of nuggets) {
         const dx = x - nug.cx;
         const dy = y - nug.cy;
         const dist = Math.sqrt(dx * dx + dy * dy);
-        const angle = Math.atan2(dy, dx);
 
-        const rDeformed = getOrganicRadius(angle, nug.radius, nug.seedOffset);
+        if (dist < nug.size * 1.5) {
+          // 結晶の形状計算（ファセット・角張り）
+          const rotX = dx * Math.cos(nug.angle) - dy * Math.sin(nug.angle);
+          const rotY = dx * Math.sin(nug.angle) + dy * Math.cos(nug.angle);
+          
+          let mH = 0;
+          let fnx = 0, fny = 0, fnz = 1;
 
-        if (dist < rDeformed) {
-          // 原石表面の法線ベクトル (N) を計算
-          let nx = dx / rDeformed;
-          let ny = dy / rDeformed;
+          if (nug.crystalType === 0) {
+            // 方解石・黄鉄鉱風（シャープな面で構成された多面体）
+            const facet1 = Math.abs(rotX * 0.8 + rotY * 0.6);
+            const facet2 = Math.abs(rotX * -0.6 + rotY * 0.8);
+            const rawShape = nug.size - Math.max(facet1, facet2);
+            mH = Math.max(0, rawShape / nug.size);
+            
+            // 面ごとの平坦な法線（角度をカクカクさせる）
+            if (mH > 0) {
+              const facetId = Math.floor((Math.atan2(rotY, rotX) + Math.PI) / (Math.PI / 3));
+              const fAng = facetId * (Math.PI / 3);
+              fnx = Math.cos(fAng) * 0.6;
+              fny = Math.sin(fAng) * 0.6;
+              fnz = 0.8;
+            }
+          } else if (nug.crystalType === 1) {
+            // 不規則な砕けた結晶破片
+            const pNoise = pseudoNoise(x * 0.1, y * 0.1, nug.nSeed);
+            const shape = (nug.size - dist) / nug.size + (pNoise - 0.5) * 0.6;
+            mH = Math.max(0, shape);
+            fnx = (dx / (dist + 0.1)) * 0.5;
+            fny = (dy / (dist + 0.1)) * 0.5;
+            fnz = 0.86;
+          } else {
+            // 筋状の鉱脈
+            const lineDist = Math.abs(rotX * 0.3 + Math.sin(rotY * 0.2) * 5);
+            mH = Math.max(0, (nug.size * 0.5 - lineDist) / (nug.size * 0.5));
+            fnx = rotX > 0 ? 0.4 : -0.4;
+            fny = 0.2;
+            fnz = 0.9;
+          }
 
-          // 表面の微妙な凸凹（粗さ）を追加
-          const bump = (mulberry32(seed + x * 17 + y * 31)() - 0.5) * 0.35;
-          nx = Math.max(-1, Math.min(1, nx + bump));
-          ny = Math.max(-1, Math.min(1, ny + bump));
-          const nz = Math.sqrt(Math.max(0.05, 1 - nx * nx - ny * ny));
+          // 高さ調整（ベース高さ + 強度）
+          const finalMetalH = mH * 0.75 + 0.2;
 
-          // 1. 拡散反射（Diffuse）
-          const dotNDotL = Math.max(0.2, nx * lx + ny * ly + nz * lz);
-
-          // 2. 鏡面反射（Specular）- 金属の輝き
-          const dotNDotH = Math.max(0, nx * hx + ny * hy + nz * hz);
-          const shininess = 8 + nug.metal.gloss * 40;
-          const specPower = Math.pow(dotNDotH, shininess) * nug.metal.gloss;
-
-          // 色の合成
-          const baseL = nug.metal.light * dotNDotL;
-          const [mr, mg, mb] = hslToRgb(nug.metal.hue, nug.metal.sat, baseL);
-
-          // 白い強光沢ハイライトを乗せる
-          const specR = Math.min(255, mr + specPower * 220);
-          const specG = Math.min(255, mg + specPower * 220);
-          const specB = Math.min(255, mb + specPower * 220);
-
-          if (nug.metal.gloss > highestMetalGloss) {
-            highestMetalGloss = nug.metal.gloss;
-            pixelR = specR;
-            pixelG = specG;
-            pixelB = specB;
+          if (finalMetalH > maxMetalH) {
+            maxMetalH = finalMetalH;
+            topNugget = nug;
+            facetNormal = { nx: fnx, ny: fny, nz: fnz };
           }
         }
       }
 
-      data[idx]     = Math.round(pixelR);
-      data[idx + 1] = Math.round(pixelG);
-      data[idx + 2] = Math.round(pixelB);
+      // ── 3. 岩 vs 鉱石 の判定（岩の覆いかぶさり・埋まり感） ──
+      // 岩の高さが鉱石の高さを超えている場所は岩が覆いかぶさる
+      const isMetalVisible = maxMetalH > 0 && (maxMetalH > (rockH * 0.85) || isPureNugget);
+
+      let rR = 0, rG = 0, rB = 0;
+
+      if (isMetalVisible && topNugget) {
+        // --- 鉱石のライティング ---
+        const { nx, ny, nz } = facetNormal;
+        
+        // 微細な表面の荒れ（ノイズ）
+        const bump = (pseudoNoise(x * 0.3, y * 0.3, seed) - 0.5) * 0.2;
+        const finalNx = Math.max(-1, Math.min(1, nx + bump));
+        const finalNy = Math.max(-1, Math.min(1, ny + bump));
+        const finalNz = Math.sqrt(Math.max(0.1, 1 - finalNx * finalNx - finalNy * finalNy));
+
+        // Diffuse & Specular
+        const dotNL = Math.max(0.15, finalNx * lx + finalNy * ly + finalNz * lz);
+        const dotNH = Math.max(0, finalNx * hx + finalNy * hy + finalNz * hz);
+        
+        const gloss = topNugget.metal.gloss;
+        const spec = Math.pow(dotNH, 12 + gloss * 36) * gloss;
+
+        const baseL = topNugget.metal.light * dotNL;
+        const [mr, mg, mb] = hslToRgb(topNugget.metal.hue, topNugget.metal.sat, baseL);
+
+        // 接地影（AO）：岩と鉱石の境界線（高さが近いフチ）を暗く落とし込む
+        const edgeGap = Math.abs(maxMetalH - rockH * 0.85);
+        const shadowAO = isPureNugget ? 1.0 : Math.min(1.0, edgeGap * 5.0 + 0.2);
+
+        rR = Math.min(255, (mr + spec * 230) * shadowAO);
+        rG = Math.min(255, (mg + spec * 230) * shadowAO);
+        rB = Math.min(255, (mb + spec * 230) * shadowAO);
+
+      } else {
+        // --- 岩のライティング ---
+        // 隣接ピクセルとの高さの差から岩表面の傾き（法線）を動的計算
+        const rockH_right = getRockHeight(x + 1, y, seed);
+        const rockH_bottom = getRockHeight(x, y + 1, seed);
+
+        const rNx = (rockH - rockH_right) * 3.0;
+        const rNy = (rockH - rockH_bottom) * 3.0;
+        const rNz = Math.sqrt(Math.max(0.1, 1 - rNx * rNx - rNy * rNy));
+
+        const rDotNL = Math.max(0.1, rNx * lx + rNy * ly + rNz * lz);
+
+        // 岩の質感（泥灰岩・玄武岩調）
+        const rockBaseL = Math.max(10, Math.min(60, 22 + rockH * 35)) * rDotNL;
+        const [rkR, rkG, rkB] = hslToRgb(210, 8, rockBaseL);
+
+        rR = rkR; rG = rkG; rB = rkB;
+      }
+
+      data[idx]     = Math.round(rR);
+      data[idx + 1] = Math.round(rG);
+      data[idx + 2] = Math.round(rB);
       data[idx + 3] = 255;
     }
   }
 
   ctx.putImageData(imgData, 0, 0);
 
-  // ── 3. 外周の立体的な陰影（フレーム感） ──
+  // ── 4. フレーム外周の立体影（ビネット） ──
   ctx.save();
   const borderShadow = ctx.createRadialGradient(W/2, H/2, Math.min(W, H) * 0.35, W/2, H/2, Math.max(W, H) * 0.75);
   borderShadow.addColorStop(0, "rgba(0,0,0,0)");
-  borderShadow.addColorStop(1, "rgba(0,0,0,0.7)");
+  borderShadow.addColorStop(1, "rgba(0,0,0,0.75)");
   ctx.fillStyle = borderShadow;
   ctx.fillRect(0, 0, W, H);
 
-  // ── 4. 中央の切り抜き（イラスト表示用の透明化） ──
+  // ── 5. 中央の切り抜き（イラスト透過エリア） ──
   const padX = W * 0.11;
   const padY = H * 0.10;
   const innerW = W - padX * 2;
@@ -177,12 +267,11 @@ export function drawMetalFrame(canvas, seed, W, H, ctx) {
   ctx.restore();
 }
 
-// カードに含まれる鉱石の情報を取得（UIやレアリティ表示用）
 export function getMetalInfo(seed) {
   const rng = mulberry32(seed);
   const rngNugget = mulberry32(seed ^ 0xdeadbeef);
   const isPureNugget = rngNugget() < 0.15;
-  const nuggetCount = isPureNugget ? 35 : Math.floor(6 + rng() * 10);
+  const nuggetCount = isPureNugget ? 40 : Math.floor(8 + rng() * 12);
 
   const metalsFound = [];
   for (let i = 0; i < nuggetCount; i++) {
