@@ -8,10 +8,8 @@ function mulberry32(seed) {
   };
 }
 
-// 実際の地球上の地殻存在度（クラーク数等）を参考にした現実的なレアリティ
-// ※現在はテスト用として高めの確率に調整しています
 export const METAL_TYPES = [
-  { id: "iron",       name: "自然鉄",       rarity: 50, hue: 210, sat: 10, light: 35, gloss: 0.5 },
+  { id: "iron",       name: "自然鉄",       rarity: 50, hue: 210, sat: 10, light: 38, gloss: 0.5 },
   { id: "copper",     name: "自然銅",       rarity: 30, hue: 20,  sat: 65, light: 45, gloss: 0.7 },
   { id: "silver",     name: "自然銀",       rarity: 10, hue: 200, sat: 8,  light: 78, gloss: 0.85 },
   { id: "gold",       name: "自然金",       rarity: 5,  hue: 43,  sat: 85, light: 58, gloss: 0.95 },
@@ -55,50 +53,86 @@ export function drawMetalFrame(canvas, seed, W, H, ctx) {
   const rng2 = mulberry32(seed ^ 0xdeadbeef);
   const metal = rollMetalType(mulberry32(seed ^ 0x12345678));
 
-  // ── 0. 天文学的確率（フルメタル）判定 ──
-  // ※テスト用で15%（0.15）にしてあります。本番は 0.0001 等に絞ってください。
-  const isPureNugget = rng2() < 0.15; 
+  // 天文学的確率（フルメタル）判定
+  // ※テスト用で15%にしてあります（本番は0.0001等）
+  const isPureNugget = rng2() < 0.15;
 
-  // ── 1. ピクセル単位の岩肌＆自然鉱脈の生成 ──
+  // ── 1. 鉱石破片（クラスタ）のグリッド配置（マイクラ風） ──
+  // キャンバスを小さなセル（グリッド）に分割し、一部のセルの中に結晶の核を生成
+  const cellSize = 12; // 結晶のかたまりの基準サイズ（ピクセル）
+  const cols = Math.ceil(W / cellSize);
+  const rows = Math.ceil(H / cellSize);
+  
+  // 鉱石グループ（クラスタ）の発生位置とサイズを決定
+  const clusters = [];
+  if (!isPureNugget) {
+    const clusterCount = 2 + Math.floor(rng() * 5); // 画面内に2〜6箇所の鉱石かたまり
+    for (let c = 0; c < clusterCount; c++) {
+      clusters.push({
+        cx: rng() * W,
+        cy: rng() * H,
+        radius: 12 + rng() * 28 // かたまりの半径
+      });
+    }
+  }
+
+  // ── 2. ピクセル描画 ──
   const imgData = ctx.createImageData(W, H);
   const data = imgData.data;
-
-  // 鉱脈の基本ベクトルの決定
-  const veinAngle = rng() * Math.PI;
-  const cosA = Math.cos(veinAngle), sinA = Math.sin(veinAngle);
 
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const idx = (y * W + x) * 4;
 
-      // 岩の凹凸用多重ノイズ（FBM構造）
-      const n1 = Math.sin(x * 0.04 + rng() * 0.1) * Math.cos(y * 0.04 + rng2() * 0.1);
-      const n2 = Math.sin(x * 0.1 - y * 0.08) * 0.5;
-      const rockNoise = (n1 + n2) * 12;
+      // --- A. 自然な岩肌（グリッド非依存・周期のない不規則ノイズ） ---
+      const rx = Math.floor(x / 4);
+      const ry = Math.floor(y / 4);
+      const rockNoise = (mulberry32(seed + rx * 157 + ry * 311)() - 0.5) * 20;
+      const rockL = Math.max(15, Math.min(55, 32 + rockNoise));
+      const [rr, rg, rb] = hslToRgb(30, 8, rockL);
 
-      // 岩肌のベースカラー（粗い泥灰岩〜安山岩風）
-      const rockL = Math.max(12, Math.min(50, 28 + rockNoise));
-      const [rr, rg, rb] = hslToRgb(25 + rng()*10, 10 + rng()*10, rockL);
+      // --- B. 鉱石破片の判定（角ばったマイクラ風の塊） ---
+      let isMetal = false;
 
-      // 鉱石の発生確率計算（脈状の集中）
-      const proj = (x * cosA + y * sinA) * 0.03;
-      const veinDensity = Math.pow(Math.abs(Math.sin(proj + Math.sin(y * 0.05) * 1.5)), 8);
-      
-      // 出現判定（フルメタル時は全面、通常時は低確率＋脈）
-      const metalChance = isPureNugget ? 0.95 : (veinDensity * 0.7 + (rng() < 0.02 ? 0.4 : 0));
-      const isMetal = rng() < metalChance;
+      if (isPureNugget) {
+        isMetal = true;
+      } else {
+        // 近接する鉱石クラスタ内にあるかチェック
+        for (const cl of clusters) {
+          const dx = x - cl.cx;
+          const dy = y - cl.cy;
+          const distSq = dx * dx + dy * dy;
 
+          if (distSq < cl.radius * cl.radius) {
+            // クラスタ内において、ドット風（セル単位）で不規則に破片を散りばめる
+            const gx = Math.floor(x / 3);
+            const gy = Math.floor(y / 3);
+            const dotHash = mulberry32(seed ^ (gx * 92821 + gy * 38609))();
+            
+            // 中心に近いほど密度が高く、フチはガタガタした角張った破片になる
+            const edgeFactor = 1 - Math.sqrt(distSq) / cl.radius;
+            if (dotHash < edgeFactor * 0.85) {
+              isMetal = true;
+              break;
+            }
+          }
+        }
+      }
+
+      // --- C. 色の割り当て ---
       if (isMetal) {
-        // 金属のハイライト・陰影（左上からの仮説光）
-        const spec = Math.max(0, Math.sin((x - y) * 0.05 + rng() * 0.2));
-        const metalL = Math.min(96, metal.light + spec * (metal.gloss * 35) + (rng() - 0.5) * 10);
-        const [mr, mg, mb] = hslToRgb(metal.hue, metal.sat, metal.light > 70 ? metalL : metalL * 0.9);
+        // 破片の各ドットごとに微妙な輝き（面によるハイライト）をランダム付与
+        const bx = Math.floor(x / 2);
+        const by = Math.floor(y / 2);
+        const blockShade = (mulberry32(seed + bx * 73 + by * 19)() - 0.5) * 25;
+        
+        const metalL = Math.max(20, Math.min(95, metal.light + blockShade * metal.gloss));
+        const [mr, mg, mb] = hslToRgb(metal.hue, metal.sat, metalL);
 
         data[idx]   = mr;
         data[idx+1] = mg;
         data[idx+2] = mb;
       } else {
-        // 岩肌
         data[idx]   = rr;
         data[idx+1] = rg;
         data[idx+2] = rb;
@@ -108,26 +142,8 @@ export function drawMetalFrame(canvas, seed, W, H, ctx) {
   }
   ctx.putImageData(imgData, 0, 0);
 
-  // ── 2. 鉱石表面のシャープな輝き（スペキュラ） ──
-  const glintCount = isPureNugget ? 25 : Math.floor(2 + rng() * 6);
+  // ── 3. 外周の立体影（枠線感） ──
   ctx.save();
-  for (let g = 0; g < glintCount; g++) {
-    const gx = rng() * W;
-    const gy = rng() * H;
-    const size = 1.5 + rng() * 4 * metal.gloss;
-
-    const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, size * 2);
-    const [hr, hg, hb] = hslToRgb(metal.hue, metal.sat * 0.3, 98);
-    grad.addColorStop(0, `rgba(${hr},${hg},${hb},${0.8 * metal.gloss})`);
-    grad.addColorStop(1, `rgba(${hr},${hg},${hb},0)`);
-
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(gx, gy, size * 2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // ── 3. 外周の立体影・陰影（カード枠としての輪郭強調） ──
   const borderShadow = ctx.createRadialGradient(W/2, H/2, Math.min(W, H) * 0.35, W/2, H/2, Math.max(W, H) * 0.7);
   borderShadow.addColorStop(0, "rgba(0,0,0,0)");
   borderShadow.addColorStop(1, "rgba(0,0,0,0.65)");
@@ -135,12 +151,11 @@ export function drawMetalFrame(canvas, seed, W, H, ctx) {
   ctx.fillRect(0, 0, W, H);
 
   // ── 4. 中央の切り抜き（内側透過処理） ──
-  // フレームの太さを左右・上下で調整（キャンバスサイズの約10〜12%）
   const padX = W * 0.11;
   const padY = H * 0.10;
   const innerW = W - padX * 2;
   const innerH = H - padY * 2;
-  const cornerRadius = 8; // カード内枠の角丸
+  const cornerRadius = 8;
 
   ctx.globalCompositeOperation = "destination-out";
   ctx.beginPath();
