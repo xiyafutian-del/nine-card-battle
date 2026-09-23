@@ -8,14 +8,16 @@ function mulberry32(seed) {
   };
 }
 
+// 実際の地球上の地殻存在度（クラーク数等）を参考にした現実的なレアリティ
+// ※現在はテスト用として高めの確率に調整しています
 export const METAL_TYPES = [
-  { id: "iron",       name: "鉄",           rarity: 5, hue: 210, sat: 8,  light: 40, gloss: 0.4 },
-  { id: "copper",     name: "銅",           rarity: 5, hue: 20,  sat: 55, light: 38, gloss: 0.5 },
-  { id: "silver",     name: "銀",           rarity: 3, hue: 210, sat: 5,  light: 75, gloss: 0.8 },
-  { id: "gold",       name: "金",           rarity: 2, hue: 45,  sat: 80, light: 55, gloss: 0.9 },
-  { id: "platinum",   name: "白金",         rarity: 1, hue: 200, sat: 3,  light: 88, gloss: 0.95 },
-  { id: "meteorite",  name: "隕鉄",         rarity: 1, hue: 240, sat: 15, light: 28, gloss: 0.6 },
-  { id: "orichalcum", name: "オリハルコン", rarity: 1, hue: 160, sat: 70, light: 48, gloss: 0.85 },
+  { id: "iron",       name: "自然鉄",       rarity: 50, hue: 210, sat: 10, light: 35, gloss: 0.5 },
+  { id: "copper",     name: "自然銅",       rarity: 30, hue: 20,  sat: 65, light: 45, gloss: 0.7 },
+  { id: "silver",     name: "自然銀",       rarity: 10, hue: 200, sat: 8,  light: 78, gloss: 0.85 },
+  { id: "gold",       name: "自然金",       rarity: 5,  hue: 43,  sat: 85, light: 58, gloss: 0.95 },
+  { id: "platinum",   name: "自然白金",     rarity: 2,  hue: 200, sat: 5,  light: 85, gloss: 0.98 },
+  { id: "meteorite",  name: "隕鉄",         rarity: 1,  hue: 230, sat: 20, light: 25, gloss: 0.65 },
+  { id: "orichalcum", name: "オリハルコン", rarity: 1,  hue: 165, sat: 75, light: 50, gloss: 0.90 },
 ];
 
 export function rollMetalType(rng) {
@@ -26,7 +28,8 @@ export function rollMetalType(rng) {
 }
 
 function hslToRgb(h, s, l) {
-  h /= 360; s /= 100; l /= 100;
+  h = ((h % 360) + 360) % 360 / 360; 
+  s /= 100; l /= 100;
   let r, g, b;
   if (s === 0) { r = g = b = l; }
   else {
@@ -50,117 +53,104 @@ export function drawMetalFrame(canvas, seed, W, H, ctx) {
 
   const rng  = mulberry32(seed);
   const rng2 = mulberry32(seed ^ 0xdeadbeef);
-  const rng3 = mulberry32(seed ^ 0xabcdef);
   const metal = rollMetalType(mulberry32(seed ^ 0x12345678));
 
-  // ── 1. 母岩ベース（灰〜茶の岩肌） ──
-  const rockImg = ctx.createImageData(W, H);
+  // ── 0. 天文学的確率（フルメタル）判定 ──
+  // ※テスト用で15%（0.15）にしてあります。本番は 0.0001 等に絞ってください。
+  const isPureNugget = rng2() < 0.15; 
+
+  // ── 1. ピクセル単位の岩肌＆自然鉱脈の生成 ──
+  const imgData = ctx.createImageData(W, H);
+  const data = imgData.data;
+
+  // 鉱脈の基本ベクトルの決定
+  const veinAngle = rng() * Math.PI;
+  const cosA = Math.cos(veinAngle), sinA = Math.sin(veinAngle);
+
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
-      const i4 = (y*W+x)*4;
-      // 岩の粒状ノイズ
-      const grain = (rng() - 0.5) * 18;
-      // 層状の縞（堆積岩風）
-      const layer = Math.sin(y * 0.15 + rng2() * 0.5) * 6;
-      const rockL = Math.max(15, Math.min(65, 35 + grain + layer));
-      const rockH = 25 + rng3() * 15; // 茶〜灰
-      const rockS = 8 + rng3() * 12;
-      const [r,g,b] = hslToRgb(rockH, rockS, rockL);
-      rockImg.data[i4]=r; rockImg.data[i4+1]=g; rockImg.data[i4+2]=b; rockImg.data[i4+3]=255;
-    }
-  }
-  ctx.putImageData(rockImg, 0, 0);
+      const idx = (y * W + x) * 4;
 
-  // ── 2. 岩の亀裂 ──
-  ctx.lineCap = "round";
-  const crackN = 2 + Math.floor(rng() * 4);
-  for (let c = 0; c < crackN; c++) {
-    let cx = rng()*W, cy = rng()*H;
-    ctx.beginPath(); ctx.moveTo(cx, cy);
-    const segs = 3 + Math.floor(rng()*5);
-    for (let s = 0; s < segs; s++) {
-      cx += (rng()-0.5)*W*0.25; cy += (rng()-0.3)*H*0.2;
-      ctx.lineTo(cx, cy);
-    }
-    ctx.strokeStyle = `rgba(0,0,0,${0.25+rng()*0.2})`;
-    ctx.lineWidth = 0.4 + rng()*0.8;
-    ctx.stroke();
-    // 亀裂の明るい縁
-    ctx.strokeStyle = `rgba(255,255,255,${0.04+rng()*0.05})`;
-    ctx.lineWidth *= 2;
-    ctx.stroke();
-  }
+      // 岩の凹凸用多重ノイズ（FBM構造）
+      const n1 = Math.sin(x * 0.04 + rng() * 0.1) * Math.cos(y * 0.04 + rng2() * 0.1);
+      const n2 = Math.sin(x * 0.1 - y * 0.08) * 0.5;
+      const rockNoise = (n1 + n2) * 12;
 
-  // ── 3. 金属原石の塊・筋 ──
-  // 原石は岩の中に点在・筋状に出現
-  const veinCount = 2 + Math.floor(rng() * 4);
-  for (let v = 0; v < veinCount; v++) {
-    const startX = rng() * W;
-    const startY = rng() * H;
-    const ang = rng() * Math.PI * 2;
-    const len = W * (0.1 + rng() * 0.3);
-    const segs = 6 + Math.floor(rng() * 8);
-    let vx = startX, vy = startY;
+      // 岩肌のベースカラー（粗い泥灰岩〜安山岩風）
+      const rockL = Math.max(12, Math.min(50, 28 + rockNoise));
+      const [rr, rg, rb] = hslToRgb(25 + rng()*10, 10 + rng()*10, rockL);
 
-    for (let s = 0; s < segs; s++) {
-      const phase = s / segs;
-      // 金属の色（光沢あり）
-      const glintPhase = Math.sin(phase * Math.PI);
-      const baseL = metal.light;
-      const gloss = metal.gloss;
-      // 光沢ハイライト（研磨された原石の輝き）
-      const highlight = gloss * glintPhase * 35;
-      const L = Math.min(95, baseL + highlight + (rng()-0.5)*8);
-      const [mr,mg,mb] = hslToRgb(metal.hue + (rng()-0.5)*5, metal.sat, L);
+      // 鉱石の発生確率計算（脈状の集中）
+      const proj = (x * cosA + y * sinA) * 0.03;
+      const veinDensity = Math.pow(Math.abs(Math.sin(proj + Math.sin(y * 0.05) * 1.5)), 8);
+      
+      // 出現判定（フルメタル時は全面、通常時は低確率＋脈）
+      const metalChance = isPureNugget ? 0.95 : (veinDensity * 0.7 + (rng() < 0.02 ? 0.4 : 0));
+      const isMetal = rng() < metalChance;
 
-      // 金属塊の大きさ（ランダムな粒・塊）
-      const size = (1.5 + rng()*3) * (1 + rng()*0.5);
-      ctx.fillStyle = `rgba(${mr},${mg},${mb},${0.7+rng()*0.25})`;
-      ctx.beginPath();
-      // 丸みを帯びた不規則な形
-      ctx.ellipse(vx, vy, size, size*(0.5+rng()*0.7), ang+(rng()-0.5)*0.8, 0, Math.PI*2);
-      ctx.fill();
+      if (isMetal) {
+        // 金属のハイライト・陰影（左上からの仮説光）
+        const spec = Math.max(0, Math.sin((x - y) * 0.05 + rng() * 0.2));
+        const metalL = Math.min(96, metal.light + spec * (metal.gloss * 35) + (rng() - 0.5) * 10);
+        const [mr, mg, mb] = hslToRgb(metal.hue, metal.sat, metal.light > 70 ? metalL : metalL * 0.9);
 
-      // 強いハイライト（光沢の核）
-      if (gloss > 0.6 && glintPhase > 0.5) {
-        const [hr,hg,hb] = hslToRgb(metal.hue, metal.sat*0.3, 90+gloss*8);
-        ctx.fillStyle = `rgba(${hr},${hg},${hb},${gloss*glintPhase*0.6})`;
-        ctx.beginPath();
-        ctx.ellipse(vx-size*0.3, vy-size*0.3, size*0.35, size*0.2, ang, 0, Math.PI*2);
-        ctx.fill();
+        data[idx]   = mr;
+        data[idx+1] = mg;
+        data[idx+2] = mb;
+      } else {
+        // 岩肌
+        data[idx]   = rr;
+        data[idx+1] = rg;
+        data[idx+2] = rb;
       }
-
-      vx += Math.cos(ang+(rng()-0.5)*0.6)*(len/segs);
-      vy += Math.sin(ang+(rng()-0.5)*0.6)*(len/segs);
-      if (vx<0||vx>W||vy<0||vy>H) break;
+      data[idx+3] = 255;
     }
   }
+  ctx.putImageData(imgData, 0, 0);
 
-  // ── 4. 金属面の研磨筋（光沢を強調）──
-  if (metal.gloss > 0.5) {
-    const streakN = 5 + Math.floor(rng()*8);
-    for (let s = 0; s < streakN; s++) {
-      const sx = rng()*W, sy = rng()*H;
-      const sl = W*0.05 + rng()*W*0.15;
-      const alpha = metal.gloss * (0.06 + rng()*0.08);
-      ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
-      ctx.lineWidth = 0.3 + rng()*0.6;
-      ctx.beginPath();
-      ctx.moveTo(sx, sy);
-      ctx.lineTo(sx + sl*(rng()-0.5)*0.3, sy + sl);
-      ctx.stroke();
-    }
+  // ── 2. 鉱石表面のシャープな輝き（スペキュラ） ──
+  const glintCount = isPureNugget ? 25 : Math.floor(2 + rng() * 6);
+  ctx.save();
+  for (let g = 0; g < glintCount; g++) {
+    const gx = rng() * W;
+    const gy = rng() * H;
+    const size = 1.5 + rng() * 4 * metal.gloss;
+
+    const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, size * 2);
+    const [hr, hg, hb] = hslToRgb(metal.hue, metal.sat * 0.3, 98);
+    grad.addColorStop(0, `rgba(${hr},${hg},${hb},${0.8 * metal.gloss})`);
+    grad.addColorStop(1, `rgba(${hr},${hg},${hb},0)`);
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(gx, gy, size * 2, 0, Math.PI * 2);
+    ctx.fill();
   }
 
-  // ── 5. ビネット（周縁を暗く） ──
-  const vg = ctx.createRadialGradient(W/2,H/2,H*0.1,W/2,H/2,H*0.75);
-  vg.addColorStop(0,"rgba(0,0,0,0)");
-  vg.addColorStop(1,"rgba(0,0,0,0.45)");
-  ctx.fillStyle = vg;
-  ctx.fillRect(0,0,W,H);
+  // ── 3. 外周の立体影・陰影（カード枠としての輪郭強調） ──
+  const borderShadow = ctx.createRadialGradient(W/2, H/2, Math.min(W, H) * 0.35, W/2, H/2, Math.max(W, H) * 0.7);
+  borderShadow.addColorStop(0, "rgba(0,0,0,0)");
+  borderShadow.addColorStop(1, "rgba(0,0,0,0.65)");
+  ctx.fillStyle = borderShadow;
+  ctx.fillRect(0, 0, W, H);
+
+  // ── 4. 中央の切り抜き（内側透過処理） ──
+  // フレームの太さを左右・上下で調整（キャンバスサイズの約10〜12%）
+  const padX = W * 0.11;
+  const padY = H * 0.10;
+  const innerW = W - padX * 2;
+  const innerH = H - padY * 2;
+  const cornerRadius = 8; // カード内枠の角丸
+
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.beginPath();
+  ctx.roundRect(padX, padY, innerW, innerH, cornerRadius);
+  ctx.fill();
+
+  ctx.restore();
 }
 
 export function getMetalInfo(seed) {
   const metal = rollMetalType(mulberry32(seed ^ 0x12345678));
-  return { metal, oxidation: 0 };
-    }
+  return { metal };
+}
