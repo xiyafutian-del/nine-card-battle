@@ -1,6 +1,3 @@
-// ============ 金属テクスチャ生成 ============
-// シードから決定論的に金属テクスチャを生成する
-
 function mulberry32(seed) {
   let a = seed >>> 0;
   return function() {
@@ -11,26 +8,20 @@ function mulberry32(seed) {
   };
 }
 
-// 金属の種類定義
 export const METAL_TYPES = [
-  { id: "iron",      name: "鉄",       rarity: 5, hue: 210, sat: 8,  light: 45, oxidize: true  },
-  { id: "copper",    name: "銅",       rarity: 5, hue: 20,  sat: 55, light: 42, oxidize: true  },
-  { id: "silver",    name: "銀",       rarity: 3, hue: 210, sat: 5,  light: 72, oxidize: false },
-  { id: "gold",      name: "金",       rarity: 2, hue: 45,  sat: 80, light: 58, oxidize: false },
-  { id: "platinum",  name: "白金",     rarity: 1, hue: 200, sat: 3,  light: 85, oxidize: false },
-  { id: "meteorite", name: "隕鉄",     rarity: 1, hue: 240, sat: 15, light: 30, oxidize: true  },
-  { id: "orichalcum",name: "オリハルコン", rarity: 1, hue: 160, sat: 70, light: 50, oxidize: false },
+  { id: "iron",       name: "鉄",           rarity: 5, hue: 210, sat: 8,  light: 40, gloss: 0.4 },
+  { id: "copper",     name: "銅",           rarity: 5, hue: 20,  sat: 55, light: 38, gloss: 0.5 },
+  { id: "silver",     name: "銀",           rarity: 3, hue: 210, sat: 5,  light: 75, gloss: 0.8 },
+  { id: "gold",       name: "金",           rarity: 2, hue: 45,  sat: 80, light: 55, gloss: 0.9 },
+  { id: "platinum",   name: "白金",         rarity: 1, hue: 200, sat: 3,  light: 88, gloss: 0.95 },
+  { id: "meteorite",  name: "隕鉄",         rarity: 1, hue: 240, sat: 15, light: 28, gloss: 0.6 },
+  { id: "orichalcum", name: "オリハルコン", rarity: 1, hue: 160, sat: 70, light: 48, gloss: 0.85 },
 ];
 
-// レア度テーブル（rarity合計18）
-// 5+5+3+2+1+1+1 = 18
 export function rollMetalType(rng) {
   const total = METAL_TYPES.reduce((s, m) => s + m.rarity, 0);
   let r = rng() * total;
-  for (const m of METAL_TYPES) {
-    r -= m.rarity;
-    if (r <= 0) return m;
-  }
+  for (const m of METAL_TYPES) { r -= m.rarity; if (r <= 0) return m; }
   return METAL_TYPES[0];
 }
 
@@ -39,114 +30,137 @@ function hslToRgb(h, s, l) {
   let r, g, b;
   if (s === 0) { r = g = b = l; }
   else {
-    const hue2rgb = (p, q, t) => {
-      if (t < 0) t += 1; if (t > 1) t -= 1;
-      if (t < 1/6) return p + (q-p)*6*t;
-      if (t < 1/2) return q;
-      if (t < 2/3) return p + (q-p)*(2/3-t)*6;
+    const q = l < 0.5 ? l*(1+s) : l+s-l*s, p = 2*l-q;
+    const f = (t) => {
+      if (t<0) t+=1; if (t>1) t-=1;
+      if (t<1/6) return p+(q-p)*6*t;
+      if (t<1/2) return q;
+      if (t<2/3) return p+(q-p)*(2/3-t)*6;
       return p;
     };
-    const q = l < 0.5 ? l*(1+s) : l+s-l*s;
-    const p = 2*l-q;
-    r = hue2rgb(p,q,h+1/3); g = hue2rgb(p,q,h); b = hue2rgb(p,q,h-1/3);
+    r=f(h+1/3); g=f(h); b=f(h-1/3);
   }
   return [Math.round(r*255), Math.round(g*255), Math.round(b*255)];
 }
 
-export function drawMetalFrame(canvas, seed) {
-  const rng = mulberry32(seed);
+export function drawMetalFrame(canvas, seed, W, H, ctx) {
+  if (!ctx) ctx = canvas.getContext("2d");
+  if (!W) W = canvas.width;
+  if (!H) H = canvas.height;
+
+  const rng  = mulberry32(seed);
   const rng2 = mulberry32(seed ^ 0xdeadbeef);
+  const rng3 = mulberry32(seed ^ 0xabcdef);
   const metal = rollMetalType(mulberry32(seed ^ 0x12345678));
 
-  const W = canvas.width;
-  const H = canvas.height;
-  const ctx = canvas.getContext("2d");
-
-  // 酸化度（鉄・銅のみ）
-  const oxidation = metal.oxidize ? rng() : 0;
-
-  // ── 1. ベース色 ──
-  const imgData = ctx.createImageData(W, H);
+  // ── 1. 母岩ベース（灰〜茶の岩肌） ──
+  const rockImg = ctx.createImageData(W, H);
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const i4 = (y*W+x)*4;
-      // 研磨ムラ（縦方向の筋）
-      const streak = Math.sin(x * 0.8 + rng2() * 0.3) * 8;
-      // 微細なランダムノイズ
-      const noise = (rng() - 0.5) * 12;
-      const L = Math.max(10, Math.min(95, metal.light + streak + noise));
-      // 酸化による色変化
-      const hueShift = metal.oxidize ? oxidation * 30 : 0;
-      const satShift = metal.oxidize ? oxidation * 20 : 0;
-      const [r,g,b] = hslToRgb(
-        metal.hue + hueShift + (rng2()-0.5)*4,
-        Math.max(0, metal.sat + satShift),
-        L
-      );
-      imgData.data[i4]   = r;
-      imgData.data[i4+1] = g;
-      imgData.data[i4+2] = b;
-      imgData.data[i4+3] = 255;
+      // 岩の粒状ノイズ
+      const grain = (rng() - 0.5) * 18;
+      // 層状の縞（堆積岩風）
+      const layer = Math.sin(y * 0.15 + rng2() * 0.5) * 6;
+      const rockL = Math.max(15, Math.min(65, 35 + grain + layer));
+      const rockH = 25 + rng3() * 15; // 茶〜灰
+      const rockS = 8 + rng3() * 12;
+      const [r,g,b] = hslToRgb(rockH, rockS, rockL);
+      rockImg.data[i4]=r; rockImg.data[i4+1]=g; rockImg.data[i4+2]=b; rockImg.data[i4+3]=255;
     }
   }
-  ctx.putImageData(imgData, 0, 0);
+  ctx.putImageData(rockImg, 0, 0);
 
-  // ── 2. 研磨筋（縦方向の細いライン）──
-  const streakCount = 8 + Math.floor(rng() * 12);
-  for (let s = 0; s < streakCount; s++) {
-    const x = rng() * W;
-    const alpha = 0.03 + rng() * 0.08;
-    const bright = rng() > 0.5;
-    ctx.strokeStyle = bright ? `rgba(255,255,255,${alpha})` : `rgba(0,0,0,${alpha})`;
-    ctx.lineWidth = 0.3 + rng() * 0.8;
-    ctx.beginPath();
-    ctx.moveTo(x + (rng()-0.5)*2, 0);
-    ctx.lineTo(x + (rng()-0.5)*2, H);
+  // ── 2. 岩の亀裂 ──
+  ctx.lineCap = "round";
+  const crackN = 2 + Math.floor(rng() * 4);
+  for (let c = 0; c < crackN; c++) {
+    let cx = rng()*W, cy = rng()*H;
+    ctx.beginPath(); ctx.moveTo(cx, cy);
+    const segs = 3 + Math.floor(rng()*5);
+    for (let s = 0; s < segs; s++) {
+      cx += (rng()-0.5)*W*0.25; cy += (rng()-0.3)*H*0.2;
+      ctx.lineTo(cx, cy);
+    }
+    ctx.strokeStyle = `rgba(0,0,0,${0.25+rng()*0.2})`;
+    ctx.lineWidth = 0.4 + rng()*0.8;
+    ctx.stroke();
+    // 亀裂の明るい縁
+    ctx.strokeStyle = `rgba(255,255,255,${0.04+rng()*0.05})`;
+    ctx.lineWidth *= 2;
     ctx.stroke();
   }
 
-  // ── 3. 光沢ハイライト（酸化度が低いほど強い）──
-  if (oxidation < 0.6) {
-    const glintStrength = (1 - oxidation) * 0.35;
-    const grd = ctx.createLinearGradient(0, 0, W*0.6, H*0.4);
-    grd.addColorStop(0, `rgba(255,255,255,${glintStrength})`);
-    grd.addColorStop(0.3, `rgba(255,255,255,${glintStrength*0.3})`);
-    grd.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = grd;
-    ctx.fillRect(0, 0, W, H);
-  }
+  // ── 3. 金属原石の塊・筋 ──
+  // 原石は岩の中に点在・筋状に出現
+  const veinCount = 2 + Math.floor(rng() * 4);
+  for (let v = 0; v < veinCount; v++) {
+    const startX = rng() * W;
+    const startY = rng() * H;
+    const ang = rng() * Math.PI * 2;
+    const len = W * (0.1 + rng() * 0.3);
+    const segs = 6 + Math.floor(rng() * 8);
+    let vx = startX, vy = startY;
 
-  // ── 4. 錆・酸化パッチ ──
-  if (metal.oxidize && oxidation > 0.2) {
-    const patchCount = Math.floor(oxidation * 8);
-    for (let p = 0; p < patchCount; p++) {
-      const px = rng() * W, py = rng() * H;
-      const pr = (3 + rng() * 8);
-      const rustHue = metal.id === "copper" ? 150 + rng()*20 : 20 + rng()*15;
-      const grd = ctx.createRadialGradient(px,py,0,px,py,pr);
-      grd.addColorStop(0, `hsla(${rustHue},60%,35%,${0.4+oxidation*0.4})`);
-      grd.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = grd;
+    for (let s = 0; s < segs; s++) {
+      const phase = s / segs;
+      // 金属の色（光沢あり）
+      const glintPhase = Math.sin(phase * Math.PI);
+      const baseL = metal.light;
+      const gloss = metal.gloss;
+      // 光沢ハイライト（研磨された原石の輝き）
+      const highlight = gloss * glintPhase * 35;
+      const L = Math.min(95, baseL + highlight + (rng()-0.5)*8);
+      const [mr,mg,mb] = hslToRgb(metal.hue + (rng()-0.5)*5, metal.sat, L);
+
+      // 金属塊の大きさ（ランダムな粒・塊）
+      const size = (1.5 + rng()*3) * (1 + rng()*0.5);
+      ctx.fillStyle = `rgba(${mr},${mg},${mb},${0.7+rng()*0.25})`;
       ctx.beginPath();
-      ctx.arc(px, py, pr, 0, Math.PI*2);
+      // 丸みを帯びた不規則な形
+      ctx.ellipse(vx, vy, size, size*(0.5+rng()*0.7), ang+(rng()-0.5)*0.8, 0, Math.PI*2);
       ctx.fill();
+
+      // 強いハイライト（光沢の核）
+      if (gloss > 0.6 && glintPhase > 0.5) {
+        const [hr,hg,hb] = hslToRgb(metal.hue, metal.sat*0.3, 90+gloss*8);
+        ctx.fillStyle = `rgba(${hr},${hg},${hb},${gloss*glintPhase*0.6})`;
+        ctx.beginPath();
+        ctx.ellipse(vx-size*0.3, vy-size*0.3, size*0.35, size*0.2, ang, 0, Math.PI*2);
+        ctx.fill();
+      }
+
+      vx += Math.cos(ang+(rng()-0.5)*0.6)*(len/segs);
+      vy += Math.sin(ang+(rng()-0.5)*0.6)*(len/segs);
+      if (vx<0||vx>W||vy<0||vy>H) break;
     }
   }
 
-  // ── 5. ビネット ──
-  const vg = ctx.createRadialGradient(W/2,H/2,H*0.1,W/2,H/2,H*0.7);
-  vg.addColorStop(0, "rgba(0,0,0,0)");
-  vg.addColorStop(1, "rgba(0,0,0,0.4)");
+  // ── 4. 金属面の研磨筋（光沢を強調）──
+  if (metal.gloss > 0.5) {
+    const streakN = 5 + Math.floor(rng()*8);
+    for (let s = 0; s < streakN; s++) {
+      const sx = rng()*W, sy = rng()*H;
+      const sl = W*0.05 + rng()*W*0.15;
+      const alpha = metal.gloss * (0.06 + rng()*0.08);
+      ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+      ctx.lineWidth = 0.3 + rng()*0.6;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx + sl*(rng()-0.5)*0.3, sy + sl);
+      ctx.stroke();
+    }
+  }
+
+  // ── 5. ビネット（周縁を暗く） ──
+  const vg = ctx.createRadialGradient(W/2,H/2,H*0.1,W/2,H/2,H*0.75);
+  vg.addColorStop(0,"rgba(0,0,0,0)");
+  vg.addColorStop(1,"rgba(0,0,0,0.45)");
   ctx.fillStyle = vg;
   ctx.fillRect(0,0,W,H);
-
-  return { metal, oxidation };
 }
 
-// メタデータだけ返す（保存用）
 export function getMetalInfo(seed) {
-  const rng = mulberry32(seed ^ 0x12345678);
-  const metal = rollMetalType(rng);
-  const oxidation = metal.oxidize ? mulberry32(seed)() : 0;
-  return { metal, oxidation };
-}
+  const metal = rollMetalType(mulberry32(seed ^ 0x12345678));
+  return { metal, oxidation: 0 };
+    }
