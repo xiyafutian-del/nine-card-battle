@@ -114,17 +114,7 @@ export default function App() {
     }
   }, [pvpStatus]);
 
-  // スキンをデッキカードに付与してからバトル開始
-  function startBattleWithSkins(mode) {
-    const ownedSkins = getOwnedSkins();
-    const deckSkinsMap = getDeckSkins();
-    const deckName = activeDeck?.name || "noname";
 
-    // buildDeckしてからスキンを付与
-    const { buildDeck: bd } = require('./engine/battle.js');
-    // App内で直接buildDeckを使う
-    startBattle(mode);
-  }
 
   async function handleCreateRoom() {
     const initialState = buildInitialBattleState(cardPool, deckCounts, playerGenerator);
@@ -224,7 +214,35 @@ export default function App() {
       playerGenerator={playerGenerator}
       setPlayerGenerator={gen => handleActiveDeckChange({ ...activeDeck, generator: gen })}
       deckTotal={deckTotal}
-      onStart={mode => { startBattle(mode); setScreen("battle"); }}
+      onStart={mode => {
+  startBattle(mode);
+  setScreen("battle");
+  // スキンをバトル開始後に付与
+  setTimeout(() => {
+    const owned = getOwnedSkins();
+    const dSkins = getDeckSkins();
+    const deckName = activeDeck?.name || "noname";
+    setBattle(prev => {
+      if (!prev) return prev;
+      const attachSkins = (cards) => {
+        const idx = {};
+        return cards.map(card => {
+          const i = idx[card.cardId || card.id] || 0;
+          idx[card.cardId || card.id] = i + 1;
+          const key = `${deckName}-${card.cardId || card.id}-${i}`;
+          const instanceId = dSkins[key];
+          const skin = instanceId ? owned.find(s => s.instanceId === instanceId) : null;
+          return { ...card, skin: skin || null };
+        });
+      };
+      return {
+        ...prev,
+        playerHand: attachSkins(prev.playerHand),
+        playerDeck: attachSkins(prev.playerDeck),
+      };
+    });
+  }, 50);
+}}
       onNav={setScreen}
       onCreateRoom={handleCreateRoom}
       onJoinRoom={handleJoinRoom}
