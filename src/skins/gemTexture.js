@@ -42,10 +42,11 @@ function hslToRgb(h, s, l) {
   return [Math.round(r*255), Math.round(g*255), Math.round(b*255)];
 }
 
-export function drawGemFrame(canvas, seed, W, H, ctx) {
-  if (!ctx) ctx = canvas.getContext("2d");
+export function drawMetalFrame(canvas, seed, W, H, ctx) {
   if (!W) W = canvas.width;
   if (!H) H = canvas.height;
+  if (!ctx) ctx = canvas.getContext("2d");
+  // ctx は渡されたものをそのまま使う（クリップ済み）
 
   const rng  = mulberry32(seed);
   const rng2 = mulberry32(seed ^ 0xdeadbeef);
