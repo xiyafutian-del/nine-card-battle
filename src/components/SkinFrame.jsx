@@ -58,45 +58,40 @@ export function SkinFrame({ skin, w, h }) {
 export function SkinPreview({ skin, w = 59, h = 86 }) {
   const ref = useRef(null);
 
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || !skin) return;
+useEffect(() => {
+  const el = ref.current;
+  if (!el || !skin) return;
 
-    const dpr = window.devicePixelRatio || 2;
-    const W = Math.round(w * dpr);
-    const H = Math.round(h * dpr);
-    const F = Math.round(FRAME_PX * dpr * 2.5); // プレビューは少し太め
+  const dpr = window.devicePixelRatio || 2;
+  const W = Math.round(w * dpr);
+  const H = Math.round(h * dpr);
+  const F = Math.round(FRAME_PX * dpr);
 
-    el.width  = W;
-    el.height = H;
-    el.style.width  = w + "px";
-    el.style.height = h + "px";
+  el.width  = W;
+  el.height = H;
+  el.style.width  = w + "px";
+  el.style.height = h + "px";
 
-    const ctx = el.getContext("2d");
-    ctx.clearRect(0, 0, W, H);
+  const ctx = el.getContext("2d");
+  ctx.clearRect(0, 0, W, H);
 
-    // 背景（白）
-    ctx.fillStyle = "white";
-    ctx.fillRect(0, 0, W, H);
+  // クリップパス：外側の矩形から内側を抜く
+  ctx.save();
+  const outer = new Path2D();
+  outer.rect(0, 0, W, H);
+  const inner = new Path2D();
+  inner.rect(F, F, W - F*2, H - F*2);
+  const frame = new Path2D();
+  frame.addPath(outer);
+  frame.addPath(inner);
+  ctx.clip(frame, "evenodd");
 
-    // 枠のみクリップ
-    ctx.save();
-    const path = new Path2D();
-    path.rect(0, 0, W, H);
-    path.rect(F, F, W - F*2, H - F*2);
-    ctx.clip(path, "evenodd");
+  // クリップされたctxにテクスチャ描画
+  if (skin.type === "metal") drawMetalFrame(el, skin.seed, W, H, ctx);
+  else if (skin.type === "gem") drawGemFrame(el, skin.seed, W, H, ctx);
 
-    if (skin.type === "metal") drawMetalFrame(el, skin.seed, W, H, ctx);
-    else if (skin.type === "gem") drawGemFrame(el, skin.seed, W, H, ctx);
-
-    ctx.restore();
-
-    // 内側の黒枠
-    ctx.strokeStyle = "black";
-    ctx.lineWidth = dpr * 0.8;
-    ctx.strokeRect(F, F, W - F*2, H - F*2);
-
-  }, [skin, w, h]);
+  ctx.restore();
+}, [skin, w, h]);
 
   return (
     <canvas
