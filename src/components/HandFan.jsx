@@ -113,7 +113,7 @@ draggable={affordable && !isSpellMagic && !inGrowthMode}
             }}
           >
             <div className={`w-full h-full rounded-md ${affordable ? "ring-2 ring-black shadow-lg" : "ring-1 ring-gray-300"}`}>
-              <CardFace card={card} image={cardImages[card.id] || card.image}/>
+              <CardFace card={card} image={cardImages[card.id] || card.image} skin={card.skin || null} />
             </div>
           </div>
         );
