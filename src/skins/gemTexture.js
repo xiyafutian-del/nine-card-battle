@@ -42,7 +42,7 @@ function hslToRgb(h, s, l) {
   return [Math.round(r*255), Math.round(g*255), Math.round(b*255)];
 }
 
-export function drawMetalFrame(canvas, seed, W, H, ctx) {
+export function drawGemFrame(canvas, seed, W, H, ctx) {
   if (!W) W = canvas.width;
   if (!H) H = canvas.height;
   if (!ctx) ctx = canvas.getContext("2d");
