@@ -78,9 +78,10 @@ function getRockHeight(x, y, seed) {
 }
 
 export function drawMetalFrame(canvas, seed, W, H, ctx) {
-  if (!ctx) ctx = canvas.getContext("2d");
   if (!W) W = canvas.width;
   if (!H) H = canvas.height;
+  if (!ctx) ctx = canvas.getContext("2d");
+  // ctx は渡されたものをそのまま使う（クリップ済み）
 
   const rng = mulberry32(seed);
   const rngNugget = mulberry32(seed ^ 0xdeadbeef);
