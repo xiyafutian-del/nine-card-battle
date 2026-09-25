@@ -88,7 +88,10 @@ export default function App() {
     handleCellClick, handleSummon, handleGrowthSelect,
     setConfirmLeave, setBattle,
   } = useBattle(cardPool, deckCounts, playerGenerator, handleAction);
-
+  getDeckSkins(),           // ← 追加
+  getOwnedSkins(),          // ← 追加
+  activeDeck?.name || "noname"  // ← 追加
+  
   const battleRef = useRef(null);
   battleRef.current = battle;
 
@@ -214,9 +217,7 @@ export default function App() {
       playerGenerator={playerGenerator}
       setPlayerGenerator={gen => handleActiveDeckChange({ ...activeDeck, generator: gen })}
       deckTotal={deckTotal}
-      onStart={mode => {
-  startBattle(mode);
-  setScreen("battle");
+onStart={mode => { startBattle(mode); setScreen("battle"); }}
   // スキンをバトル開始後に付与
   setTimeout(() => {
     const owned = getOwnedSkins();
