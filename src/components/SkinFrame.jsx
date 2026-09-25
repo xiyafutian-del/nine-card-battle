@@ -2,20 +2,30 @@ import { useRef, useEffect } from 'react';
 import { drawMetalFrame } from '../skins/metalTexture.js';
 import { drawGemFrame } from '../skins/gemTexture.js';
 
-const FRAME_PX = 4;
+// カードの黒枠幅 + 1pt = 約2〜3px
+const FRAME_PX = 3;
 
-function renderFrame(canvas, skin, W, H, framePx) {
+function renderFrameOnly(canvas, skin, W, H, F) {
   const ctx = canvas.getContext("2d");
   canvas.width  = W;
   canvas.height = H;
   ctx.clearRect(0, 0, W, H);
 
-  // 全面にテクスチャ描画
-  if (skin.type === "metal") drawMetalFrame(canvas, skin.seed, W, H, ctx);
-  else if (skin.type === "gem") drawGemFrame(canvas, skin.seed, W, H, ctx);
+  // 全面にテクスチャを一時バッファに描画
+  const tmp = document.createElement("canvas");
+  tmp.width = W; tmp.height = H;
+  if (skin.type === "metal") drawMetalFrame(tmp, skin.seed, W, H, tmp.getContext("2d"));
+  else if (skin.type === "gem") drawGemFrame(tmp, skin.seed, W, H, tmp.getContext("2d"));
 
-  // 内側を透明に消す
-  ctx.clearRect(framePx, framePx, W - framePx*2, H - framePx*2);
+  // 枠の帯だけをコピー（上下左右F px分）
+  // 上辺
+  ctx.drawImage(tmp, 0, 0, W, F, 0, 0, W, F);
+  // 下辺
+  ctx.drawImage(tmp, 0, H-F, W, F, 0, H-F, W, F);
+  // 左辺（上下除く）
+  ctx.drawImage(tmp, 0, F, F, H-F*2, 0, F, F, H-F*2);
+  // 右辺（上下除く）
+  ctx.drawImage(tmp, W-F, F, F, H-F*2, W-F, F, F, H-F*2);
 }
 
 export function SkinFrame({ skin, w, h }) {
@@ -30,7 +40,7 @@ export function SkinFrame({ skin, w, h }) {
     const F = Math.round(FRAME_PX * dpr);
     el.style.width  = w + "px";
     el.style.height = h + "px";
-    renderFrame(el, skin, W, H, F);
+    renderFrameOnly(el, skin, W, H, F);
   }, [skin, w, h]);
 
   if (!skin) return null;
@@ -43,6 +53,7 @@ export function SkinFrame({ skin, w, h }) {
   );
 }
 
+// プレビュー：細い枠だけ表示（カード形状で）
 export function SkinPreview({ skin, w=59, h=86 }) {
   const ref = useRef(null);
 
@@ -52,35 +63,32 @@ export function SkinPreview({ skin, w=59, h=86 }) {
     const dpr = window.devicePixelRatio || 2;
     const W = Math.round(w * dpr);
     const H = Math.round(h * dpr);
-    // プレビューはフレーム少し太め
-    const F = Math.round(FRAME_PX * dpr * 2);
+    const F = Math.round(FRAME_PX * dpr);
     el.style.width  = w + "px";
     el.style.height = h + "px";
-
-    // 背景白
-    const ctx = el.getContext("2d");
     el.width  = W;
     el.height = H;
+
+    const ctx = el.getContext("2d");
+
+    // 背景白
     ctx.fillStyle = "white";
     ctx.fillRect(0, 0, W, H);
 
-    // フレーム描画
-    renderFrame(el, skin, W, H, F);
-
-    // 内側に薄いグレー（カード本体のイメージ）
-    ctx.fillStyle = "rgba(240,240,240,0.5)";
-    ctx.fillRect(F, F, W-F*2, H-F*2);
-
-    // 内側の黒枠線
+    // 黒枠（カードの枠を再現）
     ctx.strokeStyle = "black";
-    ctx.lineWidth = dpr * 0.8;
-    ctx.strokeRect(F+0.5, F+0.5, W-F*2-1, H-F*2-1);
+    ctx.lineWidth = Math.round(dpr * 1.5);
+    ctx.strokeRect(0.5, 0.5, W-1, H-1);
+
+    // フレームだけ描画
+    renderFrameOnly(el, skin, W, H, F);
+
   }, [skin, w, h]);
 
   return (
     <canvas
       ref={ref}
-      style={{ display:"block", border:"1px solid black", borderRadius:"2px" }}
+      style={{ display:"block", borderRadius:"2px" }}
     />
   );
 }
