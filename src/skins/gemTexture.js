@@ -1,3 +1,4 @@
+
 function mulberry32(seed) {
   let a = seed >>> 0;
   return function() {
@@ -43,10 +44,9 @@ function hslToRgb(h, s, l) {
 }
 
 export function drawGemFrame(canvas, seed, W, H, ctx) {
+  if (!ctx) ctx = canvas.getContext("2d");
   if (!W) W = canvas.width;
   if (!H) H = canvas.height;
-  if (!ctx) ctx = canvas.getContext("2d");
-  // ctx は渡されたものをそのまま使う（クリップ済み）
 
   const rng  = mulberry32(seed);
   const rng2 = mulberry32(seed ^ 0xdeadbeef);
@@ -231,4 +231,4 @@ export function getGemInfo(seed) {
   const clarity   = gem.clarity[0] + rng()  * (gem.clarity[1] - gem.clarity[0]);
   const inclusion = rng2() * (1 - clarity * 0.7);
   return { gem, clarity, inclusion };
-        }
+                               }
