@@ -2,9 +2,21 @@ import { useRef, useEffect } from 'react';
 import { drawMetalFrame } from '../skins/metalTexture.js';
 import { drawGemFrame } from '../skins/gemTexture.js';
 
-// フレーム帯の厚さ（カード幅に対するpx）
-// 既存の黒枠(1.5px相当) + 2px = 約3〜4px
 const FRAME_PX = 4;
+
+function renderFrame(canvas, skin, W, H, framePx) {
+  const ctx = canvas.getContext("2d");
+  canvas.width  = W;
+  canvas.height = H;
+  ctx.clearRect(0, 0, W, H);
+
+  // 全面にテクスチャ描画
+  if (skin.type === "metal") drawMetalFrame(canvas, skin.seed, W, H, ctx);
+  else if (skin.type === "gem") drawGemFrame(canvas, skin.seed, W, H, ctx);
+
+  // 内側を透明に消す
+  ctx.clearRect(framePx, framePx, W - framePx*2, H - framePx*2);
+}
 
 export function SkinFrame({ skin, w, h }) {
   const ref = useRef(null);
@@ -12,86 +24,58 @@ export function SkinFrame({ skin, w, h }) {
   useEffect(() => {
     const el = ref.current;
     if (!el || !skin) return;
-
     const dpr = window.devicePixelRatio || 2;
     const W = Math.round(w * dpr);
     const H = Math.round(h * dpr);
-    const F = Math.round(FRAME_PX * dpr); // フレーム帯の厚さ(px)
-
-    el.width  = W;
-    el.height = H;
+    const F = Math.round(FRAME_PX * dpr);
     el.style.width  = w + "px";
     el.style.height = h + "px";
-
-    const ctx = el.getContext("2d");
-    ctx.clearRect(0, 0, W, H);
-
-    // 枠の4辺だけに描画するクリップパスを設定
-    ctx.save();
-    const path = new Path2D();
-    // 外側
-    path.rect(0, 0, W, H);
-    // 内側（くり抜き）
-    path.rect(F, F, W - F*2, H - F*2);
-    ctx.clip(path, "evenodd");
-
-    // テクスチャを全面描画（クリップで枠のみ見える）
-    if (skin.type === "metal") drawMetalFrame(el, skin.seed, W, H, ctx);
-    else if (skin.type === "gem") drawGemFrame(el, skin.seed, W, H, ctx);
-
-    ctx.restore();
-
+    renderFrame(el, skin, W, H, F);
   }, [skin, w, h]);
 
   if (!skin) return null;
-
   return (
     <canvas
       ref={ref}
       className="absolute inset-0 pointer-events-none"
-      style={{ zIndex: 10 }}
+      style={{ zIndex:10 }}
     />
   );
 }
 
-// プレビュー（枠のみ表示）
-export function SkinPreview({ skin, w = 59, h = 86 }) {
+export function SkinPreview({ skin, w=59, h=86 }) {
   const ref = useRef(null);
 
-useEffect(() => {
-  const el = ref.current;
-  if (!el || !skin) return;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !skin) return;
+    const dpr = window.devicePixelRatio || 2;
+    const W = Math.round(w * dpr);
+    const H = Math.round(h * dpr);
+    // プレビューはフレーム少し太め
+    const F = Math.round(FRAME_PX * dpr * 2);
+    el.style.width  = w + "px";
+    el.style.height = h + "px";
 
-  const dpr = window.devicePixelRatio || 2;
-  const W = Math.round(w * dpr);
-  const H = Math.round(h * dpr);
-  const F = Math.round(FRAME_PX * dpr);
+    // 背景白
+    const ctx = el.getContext("2d");
+    el.width  = W;
+    el.height = H;
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, W, H);
 
-  el.width  = W;
-  el.height = H;
-  el.style.width  = w + "px";
-  el.style.height = h + "px";
+    // フレーム描画
+    renderFrame(el, skin, W, H, F);
 
-  const ctx = el.getContext("2d");
-  ctx.clearRect(0, 0, W, H);
+    // 内側に薄いグレー（カード本体のイメージ）
+    ctx.fillStyle = "rgba(240,240,240,0.5)";
+    ctx.fillRect(F, F, W-F*2, H-F*2);
 
-  // クリップパス：外側の矩形から内側を抜く
-  ctx.save();
-  const outer = new Path2D();
-  outer.rect(0, 0, W, H);
-  const inner = new Path2D();
-  inner.rect(F, F, W - F*2, H - F*2);
-  const frame = new Path2D();
-  frame.addPath(outer);
-  frame.addPath(inner);
-  ctx.clip(frame, "evenodd");
-
-  // クリップされたctxにテクスチャ描画
-  if (skin.type === "metal") drawMetalFrame(el, skin.seed, W, H, ctx);
-  else if (skin.type === "gem") drawGemFrame(el, skin.seed, W, H, ctx);
-
-  ctx.restore();
-}, [skin, w, h]);
+    // 内側の黒枠線
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = dpr * 0.8;
+    ctx.strokeRect(F+0.5, F+0.5, W-F*2-1, H-F*2-1);
+  }, [skin, w, h]);
 
   return (
     <canvas
