@@ -31,31 +31,44 @@ export function CardLayout({
   const scale = w / CARD_W;
   const bw = Math.max(0.5, scale * 1.5);
   const bs = `${bw}px solid black`;
-  const r  = `${3 * scale}px`;
+  const r  = `${4 * scale}px`;
+
+  // スキン着用時は内側のコンテンツが岩枠に被らないよう、わずかに内側に寄せる padding を計算
+  const innerPadding = skin ? `${3 * scale}px` : "0px";
 
   if (isCore) {
     return (
       <div className="relative flex flex-col bg-white overflow-hidden"
-        style={{ width:`${w}px`, height:`${h}px`, border:bs, borderRadius:r,
-          transform:`rotate(${rotateDeg}deg)`, transformOrigin:"center center" }}>
-        <div className="flex items-center justify-center flex-shrink-0"
-          style={{ height:"30%", borderBottom:bs }}>
-          <span className="font-bold" style={{ fontSize:`${7*scale}px` }}>コア</span>
+        style={{
+          width:`${w}px`, height:`${h}px`, border:bs, borderRadius:r,
+          opacity: dimmed ? 0.45 : 1,
+          transform:`rotate(${rotateDeg}deg)`, transformOrigin:"center center"
+        }}>
+        <div className="w-full h-full flex flex-col" style={{ padding: innerPadding }}>
+          <div className="flex items-center justify-center flex-shrink-0"
+            style={{ height:"30%", borderBottom:bs }}>
+            <span className="font-bold" style={{ fontSize:`${7*scale}px` }}>コア</span>
+          </div>
+          <div className="flex-1 flex items-center justify-center">
+            <span className="font-bold" style={{ fontSize:`${18*scale}px` }}>{card.hp}</span>
+          </div>
         </div>
-        <div className="flex-1 flex items-center justify-center">
-          <span className="font-bold" style={{ fontSize:`${18*scale}px` }}>{card.hp}</span>
-        </div>
-        {skin && <SkinFrame skin={skin} w={w} h={h}/>}
+        {/* スキンを最前面にピッタリ重ね合わせる */}
+        {skin && (
+          <div className="absolute inset-0 pointer-events-none z-10">
+            <SkinFrame skin={skin} w={w} h={h}/>
+          </div>
+        )}
       </div>
     );
   }
 
   const costW  = Math.round(w * 0.30 * 0.7);
   const nameH  = Math.round(w * 0.30 * 0.7);
-  const illH   = Math.round(h * 0.36);
-  const statsH = Math.round(h * 0.13);
+  const illH   = Math.round(h * 0.34);
+  const statsH = Math.round(h * 0.12);
   const hasTags = card.tags?.length > 0;
-  const tagsH  = hasTags ? Math.round(h * 0.10) : 0;
+  const tagsH  = hasTags ? Math.round(h * 0.09) : 0;
 
   return (
     <div className="relative flex flex-col bg-white overflow-hidden"
@@ -66,64 +79,72 @@ export function CardLayout({
         transformOrigin:"center center",
       }}>
 
-      {/* コスト + 名前 */}
-      <div className="flex items-stretch flex-shrink-0" style={{ height:`${nameH}px` }}>
-        <div className="flex items-center justify-center flex-shrink-0"
-          style={{ width:`${costW}px`, borderRight:bs, borderBottom:bs }}>
-          <span className="font-bold" style={{ fontSize:`${9*scale*0.7}px` }}>{card.cost}</span>
+      {/* カードコンテンツ本体（スキン枠の内側に収まるよう配置） */}
+      <div className="w-full h-full flex flex-col" style={{ padding: innerPadding }}>
+        
+        {/* コスト + 名前 */}
+        <div className="flex items-stretch flex-shrink-0" style={{ height:`${nameH}px` }}>
+          <div className="flex items-center justify-center flex-shrink-0"
+            style={{ width:`${costW}px`, borderRight:bs, borderBottom:bs }}>
+            <span className="font-bold" style={{ fontSize:`${9*scale*0.7}px` }}>{card.cost}</span>
+          </div>
+          <div className="flex items-center overflow-hidden flex-1"
+            style={{ padding:`0 ${2*scale}px` }}>
+            <FitText text={card.name} base={6.5*scale*0.7} min={3.5*scale*0.7}/>
+          </div>
         </div>
-        <div className="flex items-center overflow-hidden flex-1"
-          style={{ padding:`0 ${2*scale}px` }}>
-          <FitText text={card.name} base={6.5*scale*0.7} min={3.5*scale*0.7}/>
+
+        {/* イラスト */}
+        <div className="relative flex-shrink-0" style={{ height:`${illH}px` }}>
+          {image
+            ? <img src={image} alt={card.name} className="absolute inset-0 w-full h-full object-cover"/>
+            : <div className="absolute inset-0 bg-gray-50 flex items-center justify-center">
+                <span className="text-gray-300" style={{ fontSize:`${5*scale}px` }}>
+                  {ATTR_LABELS[card.attr] || ""}
+                </span>
+              </div>
+          }
         </div>
+
+        {/* 境界線 */}
+        <div style={{ borderTop:bs, flexShrink:0 }}/>
+
+        {/* ATK・射程・HP */}
+        {!isSpellMagic && (
+          <div className="flex items-center justify-between flex-shrink-0"
+            style={{ height:`${statsH}px`, padding:`0 ${3*scale}px`, borderBottom:bs }}>
+            <span className="font-bold" style={{ fontSize:`${6*scale}px` }}>{card.atk > 0 ? card.atk : "－"}</span>
+            <span style={{ fontSize:`${5*scale}px` }}>{rangeText(card)}</span>
+            <span className="font-bold" style={{ fontSize:`${6*scale}px` }}>{card.hp}</span>
+          </div>
+        )}
+
+        {/* タグ */}
+        {hasTags && (
+          <div className="flex flex-wrap flex-shrink-0"
+            style={{ height:`${tagsH}px`, padding:`0 ${3*scale}px`, alignItems:"center", gap:`${scale}px` }}>
+            {card.tags.map((t, i) => (
+              <span key={i} style={{ fontSize:`${5*scale}px`, lineHeight:1.0 }}>({t})</span>
+            ))}
+          </div>
+        )}
+
+        {/* 効果テキスト */}
+        <div className="overflow-hidden" style={{ padding:`${1*scale}px ${3*scale}px`, flex:"1 1 0" }}>
+          <span style={{ fontSize:`${4.8*scale}px`, lineHeight:1.15, display:"block" }}>
+            {card.desc || ""}
+          </span>
+        </div>
+
+        {extraBottom}
       </div>
 
-      {/* イラスト */}
-      <div className="relative flex-shrink-0" style={{ height:`${illH}px` }}>
-        {image
-          ? <img src={image} alt={card.name} className="absolute inset-0 w-full h-full object-cover"/>
-          : <div className="absolute inset-0 bg-gray-50 flex items-center justify-center">
-              <span className="text-gray-300" style={{ fontSize:`${5*scale}px` }}>
-                {ATTR_LABELS[card.attr] || ""}
-              </span>
-            </div>
-        }
-      </div>
-
-      {/* 境界線 */}
-      <div style={{ borderTop:bs, flexShrink:0 }}/>
-
-      {/* ATK・射程・HP */}
-      {!isSpellMagic && (
-        <div className="flex items-center justify-between flex-shrink-0"
-          style={{ height:`${statsH}px`, padding:`0 ${3*scale}px`, borderBottom:bs }}>
-          <span className="font-bold" style={{ fontSize:`${6*scale}px` }}>{card.atk > 0 ? card.atk : "－"}</span>
-          <span style={{ fontSize:`${5*scale}px` }}>{rangeText(card)}</span>
-          <span className="font-bold" style={{ fontSize:`${6*scale}px` }}>{card.hp}</span>
+      {/* フレームスキン（最前面に絶対配置） */}
+      {skin && (
+        <div className="absolute inset-0 pointer-events-none z-10 w-full h-full">
+          <SkinFrame skin={skin} w={w} h={h}/>
         </div>
       )}
-
-      {/* タグ */}
-      {hasTags && (
-        <div className="flex flex-wrap flex-shrink-0"
-          style={{ height:`${tagsH}px`, padding:`0 ${3*scale}px`, alignItems:"center", gap:`${scale}px` }}>
-          {card.tags.map((t, i) => (
-            <span key={i} style={{ fontSize:`${5*scale}px`, lineHeight:1.0 }}>({t})</span>
-          ))}
-        </div>
-      )}
-
-      {/* 効果テキスト */}
-      <div className="overflow-hidden" style={{ padding:`${1*scale}px ${3*scale}px`, flex:"1 1 0" }}>
-        <span style={{ fontSize:`${4.8*scale}px`, lineHeight:1.15, display:"block" }}>
-          {card.desc || ""}
-        </span>
-      </div>
-
-      {extraBottom}
-
-      {/* フレームスキン */}
-      {skin && <SkinFrame skin={skin} w={w} h={h}/>}
     </div>
   );
 }
@@ -138,7 +159,7 @@ export function UnitCell({ unit, pushed }) {
       width:`${CARD_W}px`, height:`${CARD_H}px`,
       transition:"transform 0.3s",
       transform: pushed ? "translateY(5px)" : "none",
-      display:"flex", alignItems:"center", justifyContent:"center",
+      display:"flex", itemsCenter:"center", justifyContent:"center",
     }}>
       <CardLayout
         card={{
@@ -171,8 +192,6 @@ export function CardGrid({ card, image, count, onInc, onDec, skin=null }) {
 
   const h = Math.round(w * CARD_H / CARD_W);
   const scale = w / CARD_W;
-  const bw = Math.max(0.5, scale * 1.5);
-  const bs = `${bw}px solid black`;
 
   return (
     <div ref={ref} style={{ width:"100%" }}>
@@ -191,4 +210,4 @@ export function CardGrid({ card, image, count, onInc, onDec, skin=null }) {
       )}
     </div>
   );
-          }
+}
