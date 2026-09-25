@@ -81,7 +81,6 @@ export function drawMetalFrame(canvas, seed, W, H, ctx) {
   if (!W) W = canvas.width;
   if (!H) H = canvas.height;
   if (!ctx) ctx = canvas.getContext("2d");
-  // ctx は渡されたものをそのまま使う（クリップ済み）
 
   const rng = mulberry32(seed);
   const rngNugget = mulberry32(seed ^ 0xdeadbeef);
@@ -254,7 +253,6 @@ export function drawMetalFrame(canvas, seed, W, H, ctx) {
   ctx.fillRect(0, 0, W, H);
 
   // ── 5. 中央の切り抜き（イラスト・テキスト表示用） ──
-  // カードの黒枠（border）のすぐ内側を正確にくり抜く
   const padX = W * 0.035; 
   const padY = H * 0.035; 
   const innerW = W - padX * 2;
@@ -267,7 +265,7 @@ export function drawMetalFrame(canvas, seed, W, H, ctx) {
   ctx.fill();
 
   ctx.restore();
-
+}
 
 export function getMetalInfo(seed) {
   const rng = mulberry32(seed);
