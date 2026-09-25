@@ -80,7 +80,7 @@ export function SkinScreen({ onBack }) {
           {/* ガチャ結果 */}
           {lastResult && (
             <div className="mt-3 flex items-center gap-3 border border-black p-2">
-              <SkinPreview skin={lastResult} w={44} h={64}/>
+              <SkinPreview skin={lastResult} w={32} h={46}/>
               <div>
                 <div className="font-bold text-sm">{lastResult.name}</div>
                 <div className="text-xs" style={{color: rarityColor(lastResult.rarity)}}>
@@ -130,7 +130,7 @@ export function SkinScreen({ onBack }) {
           <div className="grid gap-2" style={{gridTemplateColumns:"repeat(4,1fr)"}}>
             {sorted.map(skin => (
               <div key={skin.instanceId} className="flex flex-col items-center gap-0.5">
-                <SkinPreview skin={skin} w={56} h={82}/>
+                <SkinPreview skin={skin} w={36} h={52}/>
                 <div className="text-center" style={{fontSize:"0.45rem"}}>
                   <div className="font-bold truncate w-full">{skin.name}</div>
                   <div style={{color: rarityColor(skin.rarity)}}>
