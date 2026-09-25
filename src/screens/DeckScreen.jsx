@@ -111,16 +111,18 @@ export function DeckScreen({ cardPool, cardImages, onBack, activeDeck, onActiveD
     const cnt = editing.counts?.[c.id] || 0;
     for (let i = 0; i < cnt; i++) {
       deckCardList.push({ card: c, key: cardKey(editing.name, c.id, i), index: i });
-const allSkinTargets = [coreCardEntry, ...deckCardList];
     }
   });
-        // コアカードをスキン設定対象に追加
-const coreKey = cardKey(editing.name, "core", 0);
-const coreCardEntry = {
-  card: { id:"core", name:"コア", cost:0, hp:10, atk:0, type:"unit", attr:"none", tags:[], desc:"" },
-  key: coreKey,
-  index: 0,
-};
+
+  // コアカードをスキン設定対象に追加
+  const coreKey = cardKey(editing.name, "core", 0);
+  const coreCardEntry = {
+    card: { id: "core", name: "コア", cost: 0, hp: 10, atk: 0, type: "unit", attr: "none", tags: [], desc: "" },
+    key: coreKey,
+    index: 0,
+  };
+
+  const allSkinTargets = [coreCardEntry, ...deckCardList];
 
   return (
     <div className="min-h-screen bg-white text-black px-3 py-4">
@@ -173,8 +175,8 @@ const coreCardEntry = {
           </div>
         )}
 
-        {/* スキン設定（デッキに入っているカード） */}
-        {deckCardList.length > 0 && (
+        {/* スキン設定（コア + デッキに入っているカード） */}
+        {allSkinTargets.length > 0 && (
           <div className="border border-black p-2 mb-3">
             <div className="text-xs font-bold mb-2">スキン設定</div>
 
@@ -209,10 +211,10 @@ const coreCardEntry = {
               </div>
             )}
 
-            {/* デッキ内カード一覧 */}
+            {/* 対象カード一覧 */}
             <div className="grid gap-1.5" style={{gridTemplateColumns:"repeat(4,1fr)"}}>
-  {allSkinTargets.map(({ card, key }) => {
-                  const skinInstanceId = deckSkins[key];
+              {allSkinTargets.map(({ card, key }) => {
+                const skinInstanceId = deckSkins[key];
                 const skin = skinInstanceId ? ownedSkins.find(s => s.instanceId === skinInstanceId) : null;
                 return (
                   <button key={key}
@@ -282,4 +284,4 @@ const coreCardEntry = {
       </div>
     </div>
   );
-                                }
+}
