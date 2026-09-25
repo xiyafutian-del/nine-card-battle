@@ -55,25 +55,25 @@ export function HandFan({
       style={{height:"100px", touchAction:"none"}}
     >
       {hand.map((card, i) => {
-      // 成長選択中かどうか
-const inGrowthMode = !!selectedGrowth;
-const growthEffect = selectedGrowth?.unit?.effect;
-const growthAttrs = growthEffect
-  ? (Array.isArray(growthEffect.filter?.attr) ? growthEffect.filter.attr : [growthEffect.filter?.attr])
-  : [];
-const growthMaxCost = growthEffect?.maxCost || 99;
+        // 成長選択中かどうか
+        const inGrowthMode = !!selectedGrowth;
+        const growthEffect = selectedGrowth?.unit?.effect;
+        const growthAttrs = growthEffect
+          ? (Array.isArray(growthEffect.filter?.attr) ? growthEffect.filter.attr : [growthEffect.filter?.attr])
+          : [];
+        const growthMaxCost = growthEffect?.maxCost || 99;
 
-// このカードが成長で召喚可能か
-const isGrowthTarget = inGrowthMode &&
-  growthAttrs.includes(card.attr) &&
-  card.cost <= growthMaxCost;
+        // このカードが成長で召喚可能か
+        const isGrowthTarget = inGrowthMode &&
+          growthAttrs.includes(card.attr) &&
+          card.cost <= growthMaxCost;
 
-// 通常の召喚可能判定
-const affordable = !inGrowthMode && handCost >= card.cost && !handDisabled && !isGameOver;
-const isSpellMagic = card.type === TYPES.SPELL || card.type === TYPES.MAGIC;
+        // 通常の召喚可能判定
+        const affordable = !inGrowthMode && handCost >= card.cost && !handDisabled && !isGameOver;
+        const isSpellMagic = card.type === TYPES.SPELL || card.type === TYPES.MAGIC;
 
-// 暗くするか
-const dimmed = inGrowthMode ? !isGrowthTarget : !affordable;
+        // 暗くするか
+        const dimmed = inGrowthMode ? !isGrowthTarget : !affordable;
         const mid = (n - 1) / 2;
         const offset = i - mid;
         const rotate = offset * 7;
@@ -83,16 +83,15 @@ const dimmed = inGrowthMode ? !isGrowthTarget : !affordable;
         return (
           <div
             key={card._k || i}
-            draggable={affordable && !isSpellMagic}
+            draggable={affordable && !isSpellMagic && !inGrowthMode}
             onClick={() => {
-  if (inGrowthMode) {
-    if (isGrowthTarget) onGrowthSelect(i);
-    return;
-  }
-  if (!affordable) return;
-  if (isSpellMagic) onSpellActivate(i);
-}}
-draggable={affordable && !isSpellMagic && !inGrowthMode}
+              if (inGrowthMode) {
+                if (isGrowthTarget) onGrowthSelect(i);
+                return;
+              }
+              if (!affordable) return;
+              if (isSpellMagic) onSpellActivate(i);
+            }}
             onDragStart={e => onDragStart(e, i, card)}
             onDragEnd={onDragEnd}
             onTouchStart={e => {
@@ -109,7 +108,7 @@ draggable={affordable && !isSpellMagic && !inGrowthMode}
               zIndex: i,
               transition:"transform 0.18s ease-out",
               touchAction:"none",
-              opacity: affordable ? 1 : 0.45,
+              opacity: dimmed ? 0.45 : 1,
             }}
           >
             <div className={`w-full h-full rounded-md ${affordable ? "ring-2 ring-black shadow-lg" : "ring-1 ring-gray-300"}`}>
