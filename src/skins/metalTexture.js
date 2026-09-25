@@ -253,12 +253,13 @@ export function drawMetalFrame(canvas, seed, W, H, ctx) {
   ctx.fillStyle = borderShadow;
   ctx.fillRect(0, 0, W, H);
 
-  // ── 5. 中央の切り抜き（イラスト透過エリア） ──
-  const padX = W * 0.11;
-  const padY = H * 0.10;
+  // ── 5. 中央の切り抜き（イラスト・テキスト表示用） ──
+  // カードの黒枠（border）のすぐ内側を正確にくり抜く
+  const padX = W * 0.035; 
+  const padY = H * 0.035; 
   const innerW = W - padX * 2;
   const innerH = H - padY * 2;
-  const cornerRadius = 8;
+  const cornerRadius = 2;
 
   ctx.globalCompositeOperation = "destination-out";
   ctx.beginPath();
@@ -266,7 +267,7 @@ export function drawMetalFrame(canvas, seed, W, H, ctx) {
   ctx.fill();
 
   ctx.restore();
-}
+
 
 export function getMetalInfo(seed) {
   const rng = mulberry32(seed);
