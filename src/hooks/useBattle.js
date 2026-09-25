@@ -6,7 +6,6 @@ import { cloneBoard, buildDeck, checkVictory, applyTurnStart,
          summonUnit, attackUnit, activateCard,
          getAttackTargets, getMovable, rowToCoord } from '../engine/battle.js';
 import { runAITurn } from '../engine/ai.js';
-
 function initBattle(mode, cardPool, deckCounts, playerGenerator, deckSkins, ownedSkins, deckName) {
   const pDeck = buildDeck(cardPool, deckCounts);
   const rDeck = buildDeck(cardPool, deckCounts);
@@ -14,20 +13,27 @@ function initBattle(mode, cardPool, deckCounts, playerGenerator, deckSkins, owne
   // スキンをデッキカードに付与
   const idx = {};
   pDeck.forEach(card => {
-    const id = card.id;
-    const i = idx[id] || 0;
-    idx[id] = i + 1;
-    const key = `${deckName||"noname"}-${id}-${i}`;
+    const i = idx[card.id] || 0;
+    idx[card.id] = i + 1;
+    const key = `${deckName||"noname"}-${card.id}-${i}`;
     const instanceId = deckSkins?.[key];
     card.skin = instanceId ? (ownedSkins||[]).find(s => s.instanceId === instanceId) || null : null;
   });
 
   const pHand = pDeck.splice(0, 4);
   const rHand = rDeck.splice(0, 4);
-  // ... 以下既存のまま
   const board = { blue: [[], [], []], red: [[], [], []] };
   board.blue[1] = [{ ...makeUnitFromCard(CORE_CARD), uid: "core-blue", atk: 0 }];
   board.red[1]  = [{ ...makeUnitFromCard(CORE_CARD), uid: "core-red",  atk: 0 }];
+
+  // コアスキン
+  const coreKey = `${deckName||"noname"}-core-0`;
+  const coreInstanceId = deckSkins?.[coreKey];
+  const coreSkin = coreInstanceId ? (ownedSkins||[]).find(s => s.instanceId === coreInstanceId) || null : null;
+  if (coreSkin) {
+    board.blue[1][0].skin = coreSkin;
+  }
+
   let state = {
     board,
     playerDeck: pDeck, aiDeck: rDeck,
@@ -45,7 +51,7 @@ function initBattle(mode, cardPool, deckCounts, playerGenerator, deckSkins, owne
 }
 
 export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckSkins, ownedSkins, deckName) {
-  const [battle, setBattle] = useState(null);
+ const [battle, setBattle] = useState(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
 
   useEffect(() => {
@@ -68,10 +74,10 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
     }
   }, [battle?.active, battle?.turn]);
 
-function startBattle(mode) {
+  function startBattle(mode) {
     setConfirmLeave(false);
     setBattle(initBattle(mode, cardPool, deckCounts, playerGenerator, deckSkins, ownedSkins, deckName));
-}
+  }
 
   function requestBack() {
     if (battle && !battle.gameOver) { setConfirmLeave(true); return; }
