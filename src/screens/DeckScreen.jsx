@@ -111,6 +111,14 @@ export function DeckScreen({ cardPool, cardImages, onBack, activeDeck, onActiveD
     const cnt = editing.counts?.[c.id] || 0;
     for (let i = 0; i < cnt; i++) {
       deckCardList.push({ card: c, key: cardKey(editing.name, c.id, i), index: i });
+      // コアカードをスキン設定対象に追加
+const coreKey = cardKey(editing.name, "core", 0);
+const coreCardEntry = {
+  card: { id:"core", name:"コア", cost:0, hp:10, atk:0, type:"unit", attr:"none", tags:[], desc:"" },
+  key: coreKey,
+  index: 0,
+};
+const allSkinTargets = [coreCardEntry, ...deckCardList];
     }
   });
 
@@ -203,8 +211,8 @@ export function DeckScreen({ cardPool, cardImages, onBack, activeDeck, onActiveD
 
             {/* デッキ内カード一覧 */}
             <div className="grid gap-1.5" style={{gridTemplateColumns:"repeat(4,1fr)"}}>
-              {deckCardList.map(({ card, key }) => {
-                const skinInstanceId = deckSkins[key];
+  {allSkinTargets.map(({ card, key }) => {
+                  const skinInstanceId = deckSkins[key];
                 const skin = skinInstanceId ? ownedSkins.find(s => s.instanceId === skinInstanceId) : null;
                 return (
                   <button key={key}
