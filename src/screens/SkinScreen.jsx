@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { rollGacha, GACHA_TYPES, rarityStars, rarityColor } from '../skins/skinGacha.js';
+import { rollGacha, GACHA_TYPES } from '../skins/skinGacha.js';
 import { getOwnedSkins, addSkin } from '../skins/skinManager.js';
 import { SkinPreview } from '../components/SkinFrame.jsx';
 
@@ -29,9 +29,6 @@ export function SkinScreen({ onBack }) {
     if (filterType === "all") return true;
     return s.type === filterType;
   });
-
-  // レア度でソート（レアほど上）
-  const sorted = [...filtered].sort((a, b) => a.rarity - b.rarity);
 
   return (
     <div className="min-h-screen bg-white text-black px-3 py-4">
@@ -82,23 +79,19 @@ export function SkinScreen({ onBack }) {
             <div className="mt-3 flex items-center gap-3 border border-black p-2">
               <SkinPreview skin={lastResult} w={32} h={46}/>
               <div>
-                <div className="font-bold text-sm">{lastResult.name}</div>
-                <div className="text-xs" style={{color: rarityColor(lastResult.rarity)}}>
-                  {rarityStars(lastResult.rarity)}
+                <div className="text-xs font-bold">
+                  {lastResult.type === GACHA_TYPES.METAL ? "金属" : "宝石"}フレームを入手！
                 </div>
-                {lastResult.type === "metal" && (
-                  <div className="text-xs text-gray-500">
-                    酸化度: {Math.round((lastResult.detail?.oxidation||0)*100)}%
+                {lastResult.type === GACHA_TYPES.METAL && lastResult.detail?.isPureNugget && (
+                  <div className="text-xs text-amber-600 font-bold mt-0.5">
+                    高純度ナゲット！
                   </div>
                 )}
-                {lastResult.type === "gem" && (
-                  <div className="text-xs text-gray-500">
-                    透明度: {Math.round((lastResult.detail?.clarity||0)*100)}%
+                {lastResult.type === GACHA_TYPES.GEM && (
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    透明度: {Math.round((lastResult.detail?.clarity || 0) * 100)}%
                   </div>
                 )}
-                <div className="text-xs text-gray-400 mt-0.5">
-                  {lastResult.type === "metal" ? "金属" : "宝石"}フレーム
-                </div>
               </div>
             </div>
           )}
@@ -121,22 +114,16 @@ export function SkinScreen({ onBack }) {
             </div>
           </div>
 
-          {sorted.length === 0 && (
+          {filtered.length === 0 && (
             <div className="text-xs text-gray-400 text-center py-4">
               スキンを所持していません
             </div>
           )}
 
           <div className="grid gap-2" style={{gridTemplateColumns:"repeat(4,1fr)"}}>
-            {sorted.map(skin => (
-              <div key={skin.instanceId} className="flex flex-col items-center gap-0.5">
+            {filtered.map(skin => (
+              <div key={skin.instanceId} className="flex justify-center items-center">
                 <SkinPreview skin={skin} w={36} h={52}/>
-                <div className="text-center" style={{fontSize:"0.45rem"}}>
-                  <div className="font-bold truncate w-full">{skin.name}</div>
-                  <div style={{color: rarityColor(skin.rarity)}}>
-                    {rarityStars(skin.rarity)}
-                  </div>
-                </div>
               </div>
             ))}
           </div>
