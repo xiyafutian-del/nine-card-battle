@@ -1,31 +1,49 @@
+
 import { useRef, useEffect } from 'react';
 import { drawMetalFrame } from '../skins/metalTexture.js';
-import { drawGemFrame } from '../skins/gemTexture.js';
+// gemTexture が未実装の場合のエラー回避用フォールバック
+import * as gemModule from '../skins/gemTexture.js';
+const drawGemFrame = gemModule.drawGemFrame || drawMetalFrame;
 
-// カードの黒枠幅 + 1pt = 約2〜3px
-const FRAME_PX = 3;
-
-function renderFrameOnly(canvas, skin, W, H, F) {
+// ドーナツ形状（外側角丸 - 内側角丸）で切り抜いてテクスチャを描画する関数
+function renderFrameOnly(canvas, skin, W, H, F, R) {
   const ctx = canvas.getContext("2d");
   canvas.width  = W;
   canvas.height = H;
   ctx.clearRect(0, 0, W, H);
 
-  // 全面にテクスチャを一時バッファに描画
-  const tmp = document.createElement("canvas");
-  tmp.width = W; tmp.height = H;
-  if (skin.type === "metal") drawMetalFrame(tmp, skin.seed, W, H, tmp.getContext("2d"));
-  else if (skin.type === "gem") drawGemFrame(tmp, skin.seed, W, H, tmp.getContext("2d"));
+  ctx.save();
+  ctx.beginPath();
 
-  // 枠の帯だけをコピー（上下左右F px分）
-  // 上辺
-  ctx.drawImage(tmp, 0, 0, W, F, 0, 0, W, F);
-  // 下辺
-  ctx.drawImage(tmp, 0, H-F, W, F, 0, H-F, W, F);
-  // 左辺（上下除く）
-  ctx.drawImage(tmp, 0, F, F, H-F*2, 0, F, F, H-F*2);
-  // 右辺（上下除く）
-  ctx.drawImage(tmp, W-F, F, F, H-F*2, W-F, F, F, H-F*2);
+  // 1. 外側の角丸パス
+  if (ctx.roundRect) {
+    ctx.roundRect(0, 0, W, H, R);
+  } else {
+    ctx.rect(0, 0, W, H);
+  }
+
+  // 2. 内側の角丸パス（枠幅 F だけ内側）
+  const innerW = Math.max(0, W - F * 2);
+  const innerH = Math.max(0, H - F * 2);
+  const innerR = Math.max(0, R - F);
+
+  if (ctx.roundRect) {
+    ctx.roundRect(F, F, innerW, innerH, innerR);
+  } else {
+    ctx.rect(F, F, innerW, innerH);
+  }
+
+  // 3. 枠部分（外側と内側の間）だけをクリップ領域に指定
+  ctx.clip('evenodd');
+
+  // 4. クリップ領域にのみテクスチャを描画
+  if (skin.type === "metal") {
+    drawMetalFrame(canvas, skin.seed, W, H, ctx);
+  } else if (skin.type === "gem") {
+    drawGemFrame(canvas, skin.seed, W, H, ctx);
+  }
+
+  ctx.restore();
 }
 
 export function SkinFrame({ skin, w, h }) {
@@ -34,13 +52,20 @@ export function SkinFrame({ skin, w, h }) {
   useEffect(() => {
     const el = ref.current;
     if (!el || !skin) return;
+
     const dpr = window.devicePixelRatio || 2;
     const W = Math.round(w * dpr);
     const H = Math.round(h * dpr);
-    const F = Math.round(FRAME_PX * dpr);
+
+    // カードのサイズ(w)に合わせて枠幅 F と 角丸 R を動的に調整
+    const scale = w / 59;
+    const F = Math.round(Math.max(1.5, scale * 2.5) * dpr);
+    const R = Math.round((3 * scale) * dpr);
+
     el.style.width  = w + "px";
     el.style.height = h + "px";
-    renderFrameOnly(el, skin, W, H, F);
+
+    renderFrameOnly(el, skin, W, H, F, R);
   }, [skin, w, h]);
 
   if (!skin) return null;
@@ -48,47 +73,55 @@ export function SkinFrame({ skin, w, h }) {
     <canvas
       ref={ref}
       className="absolute inset-0 pointer-events-none"
-      style={{ zIndex:10 }}
+      style={{ zIndex: 10 }}
     />
   );
 }
 
-// プレビュー：細い枠だけ表示（カード形状で）
+// プレビュー表示用
 export function SkinPreview({ skin, w=59, h=86 }) {
   const ref = useRef(null);
 
   useEffect(() => {
     const el = ref.current;
     if (!el || !skin) return;
+
     const dpr = window.devicePixelRatio || 2;
     const W = Math.round(w * dpr);
     const H = Math.round(h * dpr);
-    const F = Math.round(FRAME_PX * dpr);
+
+    const scale = w / 59;
+    const F = Math.round(Math.max(1.5, scale * 2.5) * dpr);
+    const R = Math.round((3 * scale) * dpr);
+
     el.style.width  = w + "px";
     el.style.height = h + "px";
+
+    const ctx = el.getContext("2d");
     el.width  = W;
     el.height = H;
 
-    const ctx = el.getContext("2d");
-
-    // 背景白
+    // 背景（白）
     ctx.fillStyle = "white";
-    ctx.fillRect(0, 0, W, H);
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(0, 0, W, H, R);
+    else ctx.rect(0, 0, W, H);
+    ctx.fill();
 
-    // 黒枠（カードの枠を再現）
+    // カード外枠（黒）
     ctx.strokeStyle = "black";
     ctx.lineWidth = Math.round(dpr * 1.5);
-    ctx.strokeRect(0.5, 0.5, W-1, H-1);
+    ctx.stroke();
 
-    // フレームだけ描画
-    renderFrameOnly(el, skin, W, H, F);
+    // フレームテクスチャを重ねて描画
+    renderFrameOnly(el, skin, W, H, F, R);
 
   }, [skin, w, h]);
 
   return (
     <canvas
       ref={ref}
-      style={{ display:"block", borderRadius:"2px" }}
+      style={{ display: "block", borderRadius: "2px" }}
     />
   );
 }
