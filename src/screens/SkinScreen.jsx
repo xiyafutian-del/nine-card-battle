@@ -82,16 +82,6 @@ export function SkinScreen({ onBack }) {
                 <div className="text-xs font-bold">
                   {lastResult.type === GACHA_TYPES.METAL ? "金属" : "宝石"}フレームを入手！
                 </div>
-                {lastResult.type === GACHA_TYPES.METAL && lastResult.detail?.isPureNugget && (
-                  <div className="text-xs text-amber-600 font-bold mt-0.5">
-                    高純度ナゲット！
-                  </div>
-                )}
-                {lastResult.type === GACHA_TYPES.GEM && (
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    透明度: {Math.round((lastResult.detail?.clarity || 0) * 100)}%
-                  </div>
-                )}
               </div>
             </div>
           )}
