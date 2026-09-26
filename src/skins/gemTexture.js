@@ -43,7 +43,6 @@ function hslToRgb(h, s, l) {
   return [Math.round(r*255), Math.round(g*255), Math.round(b*255)];
 }
 
-// 高速軽量ノイズ
 function fastNoise(x, y, seed) {
   const xi = Math.floor(x), yi = Math.floor(y);
   const xf = x - xi, yf = y - yi;
@@ -59,27 +58,28 @@ function fastNoise(x, y, seed) {
   return (n00 * (1 - u) + n10 * u) * (1 - v) + (n01 * (1 - u) + n11 * u) * v;
 }
 
-export function drawGemFrame(canvas, seed, W, H, ctx) {
+// 引数に tiltX, tiltY を追加 (スマホの傾き: -1.0 ～ 1.0)
+export function drawGemFrame(canvas, seed, W, H, ctx, tiltX = 0, tiltY = 0) {
   if (!W) W = canvas.width;
   if (!H) H = canvas.height;
   if (!ctx) ctx = canvas.getContext("2d");
 
   const rng = mulberry32(seed);
 
-  // ── 1. パラメータ導出 ──
   const gem = rollGemType(rng);
-  const clarity = gem.clarity[0] + rng() * (gem.clarity[1] - gem.clarity[0]); // 透明度
+  const clarity = gem.clarity[0] + rng() * (gem.clarity[1] - gem.clarity[0]);
   
+  // レア度が高いほど（1に近づくほど）エッジのシャープさ強度（0.0～1.0）を高く設定
+  const raritySharpness = (6 - gem.rarity) / 5; 
+
   const offsetX = rng() * 500;
   const offsetY = rng() * 500;
   const scale   = 0.035 + rng() * 0.045;
-  const threshold = 0.45 + rng() * 0.28; // 宝石結晶の露出度
+  const threshold = 0.45 + rng() * 0.28;
 
-  // 母岩の色（暗い茶〜黒系の岩肌）
   const rockHue = 15 + rng() * 20;
   const rockSat = 8 + rng() * 12;
 
-  // ── 2. 低解像度バッファ処理 ──
   const downScale = 2.5;
   const bufW = Math.ceil(W / downScale);
   const bufH = Math.ceil(H / downScale);
@@ -91,8 +91,15 @@ export function drawGemFrame(canvas, seed, W, H, ctx) {
   const imgData = offCtx.createImageData(bufW, bufH);
   const data = imgData.data;
 
-  // 光源
-  const lx = -0.5, ly = -0.5, lz = 0.707;
+  // ── 傾き(tilt)を光源ベクトルに反映 ──
+  // デフォルト光源 (-0.5, -0.5) に傾き量を加算
+  let lx = -0.5 + tiltX * 1.2;
+  let ly = -0.5 + tiltY * 1.2;
+  let lz = Math.sqrt(Math.max(0.1, 1 - lx * lx - ly * ly));
+
+  // 正規化
+  const len = Math.hypot(lx, ly, lz);
+  lx /= len; ly /= len; lz /= len;
 
   for (let y = 0; y < bufH; y++) {
     for (let x = 0; x < bufW; x++) {
@@ -104,7 +111,6 @@ export function drawGemFrame(canvas, seed, W, H, ctx) {
       let val = fastNoise(nx, ny, seed) * 0.65 + fastNoise(nx * 2.5, ny * 2.5, seed + 1) * 0.35;
       val = Math.pow(val, 1.1);
 
-      // 法線計算
       const valR = fastNoise(nx + 0.1, ny, seed);
       const valB = fastNoise(nx, ny + 0.1, seed);
       const normalX = (val - valR) * 2.2;
@@ -115,24 +121,42 @@ export function drawGemFrame(canvas, seed, W, H, ctx) {
 
       let r = 0, g = 0, b = 0;
 
+      // ── 接合部（エッジ）の判定とくっきり強調処理 ──
+      const edgeDistance = Math.abs(val - threshold);
+      const edgeWidth = 0.08 * (1.0 - raritySharpness * 0.6); // 高レアほど境界帯を狭くシャープに
+
       if (val > threshold) {
         // --- 宝石エリア ---
         const depth = (val - threshold) / (1 - threshold);
-        
-        // 透明感のあるベース光度
         const transL = gem.light * (0.6 + depth * 0.45 + dotNL * 0.3) * clarity;
-        const [gr, gg, gb] = hslToRgb(gem.hue, gem.sat, Math.min(96, transL));
+        let [gr, gg, gb] = hslToRgb(gem.hue, gem.sat, Math.min(96, transL));
 
-        // ガラス質の鋭い表面反射（Specular）
         const spec = Math.pow(dotNL, 16 + clarity * 32) * (0.6 + clarity * 0.4) * 220;
+
+        // エッジ部分に輝度ハイライトを追加（高レアほどクッキリ反射）
+        if (edgeDistance < edgeWidth) {
+          const edgeHighlight = (1 - edgeDistance / edgeWidth) * raritySharpness * 80;
+          gr += edgeHighlight;
+          gg += edgeHighlight;
+          gb += edgeHighlight;
+        }
 
         r = Math.min(255, gr + spec);
         g = Math.min(255, gg + spec);
-        b = Math.min(255, gb + spec); // ← ここにあった mb || を修正
+        b = Math.min(255, gb + spec);
       } else {
         // --- 母岩エリア ---
         const rockL = Math.max(8, Math.min(42, (15 + val * 30) * dotNL));
-        const [rkR, rkG, rkB] = hslToRgb(rockHue, rockSat, rockL);
+        let [rkR, rkG, rkB] = hslToRgb(rockHue, rockSat, rockL);
+
+        // 接合部の母岩側に暗いドロップシノウ（影）を落として落ち込みを表現
+        if (edgeDistance < edgeWidth) {
+          const shadowFactor = 1.0 - (1 - edgeDistance / edgeWidth) * raritySharpness * 0.55;
+          rkR *= shadowFactor;
+          rkG *= shadowFactor;
+          rkB *= shadowFactor;
+        }
+
         r = rkR; g = rkG; b = rkB;
       }
 
@@ -145,17 +169,16 @@ export function drawGemFrame(canvas, seed, W, H, ctx) {
 
   offCtx.putImageData(imgData, 0, 0);
 
-  // ── 3. 本番キャンバスへ拡大転送 ──
   ctx.save();
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(offCanvas, 0, 0, bufW, bufH, 0, 0, W, H);
 
-  // ── 4. 宝石特有の「反射線」「スパーク」 ──
+  // 反射線も傾きに合わせてわずかにシフト
   ctx.strokeStyle = `rgba(255, 255, 255, ${0.12 + clarity * 0.25})`;
   ctx.lineWidth = 0.7;
   const lines = 3 + Math.floor(rng() * 4);
   for (let l = 0; l < lines; l++) {
-    const lx1 = rng() * W, ly1 = rng() * H;
+    const lx1 = rng() * W + tiltX * 15, ly1 = rng() * H + tiltY * 15;
     const lx2 = lx1 + (rng() - 0.5) * W * 0.5;
     const ly2 = ly1 + (rng() - 0.5) * H * 0.5;
     ctx.beginPath();
@@ -164,11 +187,12 @@ export function drawGemFrame(canvas, seed, W, H, ctx) {
     ctx.stroke();
   }
 
+  // スパーク（煌めき）
   if (clarity > 0.6) {
     const sparkCount = Math.floor((clarity - 0.5) * 8);
     for (let s = 0; s < sparkCount; s++) {
-      const sx = rng() * W;
-      const sy = rng() * H;
+      const sx = rng() * W + tiltX * 20;
+      const sy = rng() * H + tiltY * 20;
       const [sr, sg, sb] = hslToRgb((gem.hue + rng() * 60 - 30) % 360, 90, 85);
       
       ctx.fillStyle = `rgba(${sr},${sg},${sb},${0.4 + rng() * 0.5})`;
@@ -178,7 +202,6 @@ export function drawGemFrame(canvas, seed, W, H, ctx) {
     }
   }
 
-  // ビネット
   const borderShadow = ctx.createRadialGradient(W/2, H/2, Math.min(W, H) * 0.35, W/2, H/2, Math.max(W, H) * 0.75);
   borderShadow.addColorStop(0, "rgba(0,0,0,0)");
   borderShadow.addColorStop(1, "rgba(0,0,0,0.72)");
@@ -186,11 +209,4 @@ export function drawGemFrame(canvas, seed, W, H, ctx) {
   ctx.fillRect(0, 0, W, H);
 
   ctx.restore();
-}
-
-export function getGemInfo(seed) {
-  const rng = mulberry32(seed);
-  const gem = rollGemType(rng);
-  const clarity = gem.clarity[0] + rng() * (gem.clarity[1] - gem.clarity[0]);
-  return { gem, clarity };
 }
