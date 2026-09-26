@@ -79,7 +79,7 @@ export function drawGemFrame(canvas, seed, W, H, ctx) {
   const rockHue = 15 + rng() * 20;
   const rockSat = 8 + rng() * 12;
 
-  // ── 2. 低解像度バッファ処理（計算量を約1/6に圧縮） ──
+  // ── 2. 低解像度バッファ処理 ──
   const downScale = 2.5;
   const bufW = Math.ceil(W / downScale);
   const bufH = Math.ceil(H / downScale);
@@ -116,10 +116,10 @@ export function drawGemFrame(canvas, seed, W, H, ctx) {
       let r = 0, g = 0, b = 0;
 
       if (val > threshold) {
-        // --- 宝石エリア（透明感線形グラデーション＋深み） ---
+        // --- 宝石エリア ---
         const depth = (val - threshold) / (1 - threshold);
         
-        // 透明感のあるベース光度（奥からの透け色）
+        // 透明感のあるベース光度
         const transL = gem.light * (0.6 + depth * 0.45 + dotNL * 0.3) * clarity;
         const [gr, gg, gb] = hslToRgb(gem.hue, gem.sat, Math.min(96, transL));
 
@@ -128,7 +128,7 @@ export function drawGemFrame(canvas, seed, W, H, ctx) {
 
         r = Math.min(255, gr + spec);
         g = Math.min(255, gg + spec);
-        b = Math.min(255, mb || (gb + spec));
+        b = Math.min(255, gb + spec); // ← ここにあった mb || を修正
       } else {
         // --- 母岩エリア ---
         const rockL = Math.max(8, Math.min(42, (15 + val * 30) * dotNL));
@@ -150,8 +150,7 @@ export function drawGemFrame(canvas, seed, W, H, ctx) {
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(offCanvas, 0, 0, bufW, bufH, 0, 0, W, H);
 
-  // ── 4. 宝石特有の「透明感オーバーレイ」「ファセット（カット面）線」「キラメキ」 ──
-  // ファセットカット状の反射線
+  // ── 4. 宝石特有の「反射線」「スパーク」 ──
   ctx.strokeStyle = `rgba(255, 255, 255, ${0.12 + clarity * 0.25})`;
   ctx.lineWidth = 0.7;
   const lines = 3 + Math.floor(rng() * 4);
@@ -165,7 +164,6 @@ export function drawGemFrame(canvas, seed, W, H, ctx) {
     ctx.stroke();
   }
 
-  // 高透過スパーク（輝点）
   if (clarity > 0.6) {
     const sparkCount = Math.floor((clarity - 0.5) * 8);
     for (let s = 0; s < sparkCount; s++) {
@@ -180,7 +178,7 @@ export function drawGemFrame(canvas, seed, W, H, ctx) {
     }
   }
 
-  // 外周立体影（ビネット）
+  // ビネット
   const borderShadow = ctx.createRadialGradient(W/2, H/2, Math.min(W, H) * 0.35, W/2, H/2, Math.max(W, H) * 0.75);
   borderShadow.addColorStop(0, "rgba(0,0,0,0)");
   borderShadow.addColorStop(1, "rgba(0,0,0,0.72)");
