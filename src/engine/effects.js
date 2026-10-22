@@ -174,6 +174,13 @@ export function applyAction(effect, targets, ctx, state) {
       }
       break;
     }
+      
+      case "unrotate":
+  targets.forEach(t => {
+    const u = s.board[t.side][t.col][t.idx];
+    if (u) { u.rotateDeg = Math.min(0, (u.rotateDeg||0) + 90); u.acted = false; u.stunned = false; u.actCount = 0; log.push(`${u.name}が行動可能に`); }
+  });
+  break;
 
     case "growth": {
       const h = side === "blue" ? [...s.playerHand] : [...s.aiHand];
@@ -267,6 +274,7 @@ export function makeUnitFromCard(card) {
     conditional: card.conditional || null,
     skin: card.skin || null,
     _k: card._k || nextKey(),
+    moved: false, overclocked: false,
   };
 }
 
