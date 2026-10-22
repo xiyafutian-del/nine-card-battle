@@ -210,3 +210,9 @@ export function drawGemFrame(canvas, seed, W, H, ctx, tiltX = 0, tiltY = 0) {
 
   ctx.restore();
 }
+export function getGemInfo(seed) {
+  const rng = mulberry32(seed);
+  const gem = rollGemType(rng);
+  const clarity = gem.clarity[0] + rng() * (gem.clarity[1] - gem.clarity[0]);
+  return { gem, clarity };
+}
