@@ -3,79 +3,58 @@ import { CardFace } from './CardDesign.jsx';
 import { TYPES } from '../constants/index.js';
 
 export function HandFan({
-  hand, handCost, handDisabled, isGameOver,
+  hand, handCost, handDisabled, isGameOver, phase,
   cardImages, onSummon, onSpellActivate,
-  draggingCard, onDragStart, onDragEnd,
+  onDragStart, onDragEnd,
   selectedGrowth, onGrowthSelect,
 }) {
-  const swipeRef = useRef({ startX:0, startY:0, idx:null, dragging:false, card:null });
-  const boardRef = useRef(null);
+  const swipeRef = useRef({ startX: 0, startY: 0, idx: null, dragging: false });
 
-  function handTouchStart(e, i, card, affordable) {
-    if (!affordable) return;
+  // 成長選択中の条件
+  const inGrowthMode = !!selectedGrowth;
+  const gEffect = selectedGrowth?.unit?.effect;
+  const gAttrs = gEffect
+    ? (Array.isArray(gEffect.filter?.attr) ? gEffect.filter.attr : [gEffect.filter?.attr])
+    : [];
+  const gMax = gEffect?.maxCost ?? 99;
+
+  function handTouchStart(e, i) {
     const t = e.touches[0];
-    swipeRef.current = { startX:t.clientX, startY:t.clientY, idx:i, dragging:false, card };
+    swipeRef.current = { startX: t.clientX, startY: t.clientY, idx: i, dragging: false };
   }
-
   function handTouchMove(e) {
     const s = swipeRef.current;
     if (s.idx == null) return;
-    e.preventDefault();
+    if (e.cancelable) e.preventDefault();
     const t = e.touches[0];
-    const dy = s.startY - t.clientY;
-    const dx = Math.abs(s.startX - t.clientX);
-    if (dy > 12 || dx > 12) s.dragging = true;
+    if (Math.abs(s.startY - t.clientY) > 12 || Math.abs(s.startX - t.clientX) > 12) s.dragging = true;
   }
-
   function handTouchEnd(e) {
     const s = swipeRef.current;
-    if (s.idx == null) { return; }
+    if (s.idx == null) return;
     if (s.dragging) {
       const t = e.changedTouches[0];
-      // Board の位置を取得して col/row を計算
-      const boardEl = document.getElementById('battle-board');
-      if (boardEl) {
-        const rect = boardEl.getBoundingClientRect();
-        if (t.clientX >= rect.left && t.clientX <= rect.right &&
-            t.clientY >= rect.top  && t.clientY <= rect.bottom) {
-          const col = Math.min(2, Math.max(0, Math.floor((t.clientX - rect.left) / (rect.width / 3))));
-          const row = Math.min(5, Math.max(0, Math.floor((t.clientY - rect.top)  / (rect.height / 6))));
-          onSummon(s.idx, row, col);
-        }
-      }
+      // 指を離した位置のマスを取得（反転盤面でも論理行・列が取れる）
+      const cell = document.elementFromPoint(t.clientX, t.clientY)?.closest?.('[data-cell]');
+      if (cell) onSummon(s.idx, Number(cell.dataset.row), Number(cell.dataset.col));
     }
-    swipeRef.current = { startX:0, startY:0, idx:null, dragging:false, card:null };
+    swipeRef.current = { startX: 0, startY: 0, idx: null, dragging: false };
   }
 
   const n = hand.length;
 
   return (
-    <div
-      className="relative flex justify-center items-end flex-shrink-0"
-      style={{height:"100px", touchAction:"none"}}
-    >
+    <div className="relative flex justify-center items-end flex-shrink-0"
+      style={{ height: "100px", touchAction: "none" }}>
       {hand.map((card, i) => {
-        // 成長選択中かどうか
-        const inGrowthMode = !!selectedGrowth;
-        const growthEffect = selectedGrowth?.unit?.effect;
-        const growthAttrs = growthEffect
-          ? (Array.isArray(growthEffect.filter?.attr) ? growthEffect.filter.attr : [growthEffect.filter?.attr])
-          : [];
-        const growthMaxCost = growthEffect?.maxCost || 99;
-
-        // このカードが成長で召喚可能か
-        const isGrowthTarget = inGrowthMode &&
-          growthAttrs.includes(card.attr) &&
-          card.cost <= growthMaxCost;
-
-        // 通常の召喚可能判定
-        const affordable = !inGrowthMode && handCost >= card.cost && !handDisabled && !isGameOver;
         const isSpellMagic = card.type === TYPES.SPELL || card.type === TYPES.MAGIC;
+        const isGrowthTarget = inGrowthMode && gAttrs.includes(card.attr) && card.cost <= gMax;
+        // スペル・魔法はいつでも、ユニット・施設は召喚フェーズのみ
+        const phaseOk = isSpellMagic || phase === "summon";
+        const affordable = !inGrowthMode && handCost >= card.cost && !handDisabled && !isGameOver && phaseOk;
+        const usable = inGrowthMode ? isGrowthTarget : affordable;
 
-        // 暗くするか
-        const dimmed = inGrowthMode ? !isGrowthTarget : !affordable;
-        const mid = (n - 1) / 2;
-        const offset = i - mid;
+        const offset = i - (n - 1) / 2;
         const rotate = offset * 7;
         const translateX = offset * 34;
         const translateY = Math.abs(offset) * 6;
@@ -83,36 +62,30 @@ export function HandFan({
         return (
           <div
             key={card._k || i}
-            draggable={affordable && !isSpellMagic && !inGrowthMode}
-            onClick={() => {
-              if (inGrowthMode) {
-                if (isGrowthTarget) onGrowthSelect(i);
-                return;
-              }
-              if (!affordable) return;
-              if (isSpellMagic) onSpellActivate(i);
+            draggable={affordable && !isSpellMagic}
+            onClick={e => {
+              e.stopPropagation();
+              if (inGrowthMode) { if (isGrowthTarget) onGrowthSelect(i); return; }
+              if (affordable && isSpellMagic) onSpellActivate(i);
             }}
             onDragStart={e => onDragStart(e, i, card)}
             onDragEnd={onDragEnd}
-            onTouchStart={e => {
-              if (isSpellMagic) return;
-              handTouchStart(e, i, card, affordable);
-            }}
+            onTouchStart={e => { if (affordable && !isSpellMagic) handTouchStart(e, i); }}
             onTouchMove={handTouchMove}
             onTouchEnd={handTouchEnd}
-            className={`absolute bottom-0 ${affordable ? "cursor-grab active:cursor-grabbing" : ""}`}
+            className={`absolute bottom-0 ${usable ? "cursor-grab active:cursor-grabbing" : ""}`}
             style={{
-              width:"59px", height:"86px",
-              transform:`translateX(${translateX}px) translateY(${translateY}px) rotate(${rotate}deg) scale(${affordable ? 1 : 0.92})`,
-              transformOrigin:"bottom center",
+              width: "59px", height: "86px",
+              transform: `translateX(${translateX}px) translateY(${translateY}px) rotate(${rotate}deg) scale(${usable ? 1 : 0.92})`,
+              transformOrigin: "bottom center",
               zIndex: i,
-              transition:"transform 0.18s ease-out",
-              touchAction:"none",
-              opacity: dimmed ? 0.45 : 1,
+              transition: "transform 0.18s ease-out",
+              touchAction: "none",
+              opacity: usable ? 1 : 0.45,
             }}
           >
-            <div className={`w-full h-full rounded-md ${affordable ? "ring-2 ring-black shadow-lg" : "ring-1 ring-gray-300"}`}>
-              <CardFace card={card} image={cardImages[card.id] || card.image} skin={card.skin || null} />
+            <div className={`w-full h-full rounded-md ${usable ? "ring-2 ring-black shadow-lg" : "ring-1 ring-gray-300"}`}>
+              <CardFace card={card} image={cardImages?.[card.id] || card.image} skin={card.skin || null}/>
             </div>
           </div>
         );
