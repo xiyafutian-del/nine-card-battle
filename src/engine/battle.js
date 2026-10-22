@@ -1,9 +1,7 @@
 import { TYPES, MAX_TURNS, getGeneratorCost } from '../constants/index.js';
 import { makeUnitFromCard, shuffle, resolveTargets, applyAction,
-         calcForgeBonus, calcPassiveCostReduction,
-         applyConditionals } from './effects.js';
+         calcForgeBonus, calcPassiveCostReduction, applyConditionals } from './effects.js';
 
-// ============ 盤面クローン ============
 export function cloneBoard(board) {
   return {
     blue: board.blue.map(col => col.map(u => ({ ...u }))),
@@ -11,12 +9,13 @@ export function cloneBoard(board) {
   };
 }
 
-// ============ 射程計算 ============
+// ===== 射程 =====
+const isTank = u => u && (u.type === TYPES.TANK || u.tags?.includes("タンク"));
+
 function effectiveVRange(attackerSide, targetCol, baseVRange, board) {
   const enem = attackerSide === "blue" ? "red" : "blue";
   for (let i = 0; i < board[enem][targetCol].length; i++) {
-    if (board[enem][targetCol][i].type === TYPES.TANK)
-      return Math.min(baseVRange, i + 1);
+    if (isTank(board[enem][targetCol][i])) return Math.min(baseVRange, i + 1);
   }
   return baseVRange;
 }
@@ -38,7 +37,6 @@ export function getValidTargets(side, col, idx, hRange, vRange, board) {
   return targets;
 }
 
-// BFS（距離射程）
 export function getDiamondTargets(side, col, idx, dRange, board) {
   const enem = side === "blue" ? "red" : "blue";
   const key = (s, c, i) => `${s},${c},${i}`;
@@ -50,24 +48,20 @@ export function getDiamondTargets(side, col, idx, dRange, board) {
     const cur = queue[qi++];
     const d = dist.get(key(cur.s, cur.c, cur.i));
     if (d >= dRange) continue;
-    const neighbors = [];
-    if (cur.i > 0) neighbors.push({ s: cur.s, c: cur.c, i: cur.i - 1 });
-    if (cur.i < 2) neighbors.push({ s: cur.s, c: cur.c, i: cur.i + 1 });
-    if (cur.c > 0) neighbors.push({ s: cur.s, c: cur.c - 1, i: cur.i });
-    if (cur.c < 2) neighbors.push({ s: cur.s, c: cur.c + 1, i: cur.i });
-    // 陣をまたぐ（前→敵陣）
-    if (cur.i === 0) {
-      const os = cur.s === "blue" ? "red" : "blue";
-      neighbors.push({ s: os, c: cur.c, i: 0 });
-    }
-    for (const nb of neighbors) {
+    const nbs = [];
+    if (cur.i > 0) nbs.push({ s: cur.s, c: cur.c, i: cur.i - 1 });
+    if (cur.i < 2) nbs.push({ s: cur.s, c: cur.c, i: cur.i + 1 });
+    if (cur.c > 0) nbs.push({ s: cur.s, c: cur.c - 1, i: cur.i });
+    if (cur.c < 2) nbs.push({ s: cur.s, c: cur.c + 1, i: cur.i });
+    if (cur.i === 0) nbs.push({ s: cur.s === "blue" ? "red" : "blue", c: cur.c, i: 0 });
+    for (const nb of nbs) {
       if (nb.c < 0 || nb.c > 2 || nb.i < 0 || nb.i > 2) continue;
       const nk = key(nb.s, nb.c, nb.i);
       if (dist.has(nk)) continue;
       dist.set(nk, d + 1);
       const unit = board[nb.s][nb.c][nb.i];
       if (nb.s === enem && unit) targets.push({ col: nb.c, idx: nb.i });
-      if (!unit || unit.type !== TYPES.TANK) queue.push(nb);
+      if (!isTank(unit)) queue.push(nb);
     }
   }
   return targets;
@@ -80,26 +74,25 @@ export function getAttackTargets(side, col, idx, unit, board) {
   return getValidTargets(side, col, idx, unit.hRange, unit.vRange, board);
 }
 
-// ============ 移動可能マス ============
+// ===== 移動 =====
 export function getMovable(side, col, idx, board) {
   const unit = board[side][col][idx];
-  if (!unit || unit.isFacility) return [];
+  if (!unit || unit.isFacility || unit.moved) return [];
   const result = [];
   [[0,-1],[0,1],[-1,0],[1,0]].forEach(([dc, di]) => {
     const nc = col + dc, ni = idx + di;
     if (nc < 0 || nc > 2 || ni < 0 || ni > 2) return;
     if (dc === 0) result.push({ col: nc, idx: ni });
-    else if (board[side][nc].length < 3) result.push({ col: nc, idx: Math.min(ni, board[side][nc].length) });
+    else if (board[side][nc].length < 3)
+      result.push({ col: nc, idx: Math.min(ni, board[side][nc].length) });
   });
   return result;
 }
 
-// ============ 行変換 ============
 export function rowToCoord(row) {
   return row < 3 ? { side: "red", idx: 2 - row } : { side: "blue", idx: row - 3 };
 }
 
-// ============ デッキ構築 ============
 export function buildDeck(pool, counts) {
   const list = [];
   pool.forEach(c => {
@@ -109,7 +102,7 @@ export function buildDeck(pool, counts) {
   return shuffle(list);
 }
 
-// ============ 勝敗判定 ============
+// ===== 勝敗 =====
 export function checkVictory(board, turn) {
   const blueCore = board.blue.flat().find(u => u?.isCore);
   const redCore  = board.red.flat().find(u => u?.isCore);
@@ -127,167 +120,148 @@ export function checkVictory(board, turn) {
   return { over: false };
 }
 
-// ============ ターン開始処理 ============
+// ===== ターン開始 =====
 export function applyTurnStart(state, side, generatorType) {
-  let hand = side === "blue" ? [...state.playerHand] : [...state.aiHand];
-  let deck = side === "blue" ? [...state.playerDeck] : [...state.aiDeck];
+  const hand = side === "blue" ? [...state.playerHand] : [...state.aiHand];
+  const deck = side === "blue" ? [...state.playerDeck] : [...state.aiDeck];
   let cost = side === "blue" ? state.playerCost : state.aiCost;
   const log = [...state.log];
   const board = cloneBoard(state.board);
 
-  // ドロー
   if (deck.length > 0 && hand.length < 10) hand.push(deck.shift());
 
-  // アンタップ
-  board[side].forEach(col => col.forEach(u => {
-    if (u) {
-      u.rotateDeg = Math.min(0, (u.rotateDeg || 0) + 90);
-      u.actCount = 0;
-      u.stunned = false;
-      u.acted = false;
-    }
-  }));
-  
-  // 発電機コスト
   const gained = getGeneratorCost(generatorType || "water", state.turn);
   cost += gained;
   log.push(`${side === "blue" ? "あなた" : "相手"}コスト+${gained}`);
 
+  // 回転を時計回り90度戻す（0度は超えない）・行動状態リセット
+  board[side].forEach(col => col.forEach(u => {
+    if (!u) return;
+    u.rotateDeg = Math.min(0, (u.rotateDeg || 0) + 90);
+    u.acted = false; u.stunned = false; u.moved = false; u.actCount = 0;
+  }));
+
   // 施設の毎ターン効果
   board[side].forEach((col, ci) => col.forEach((u, ii) => {
-    if (!u?.effect) return;
-    const e = u.effect;
-    if (e.trigger === "turn_start") {
-      const ctx = { board, side, col: ci, idx: ii, hand, log };
-      const targets = resolveTargets(e.target || "self", ctx);
-      const ns = applyAction(e, targets, ctx, { ...state, board, playerCost: cost, aiCost: cost, log });
-      cost = side === "blue" ? ns.playerCost : ns.aiCost;
-    }
+    if (u?.effect?.trigger !== "turn_start") return;
+    const ctx = { board, side, col: ci, idx: ii, hand, log };
+    const targets = resolveTargets(u.effect.target || "self", ctx);
+    const ns = applyAction(u.effect, targets, ctx, {
+      ...state, board, log,
+      playerCost: side === "blue" ? cost : state.playerCost,
+      aiCost: side === "red" ? cost : state.aiCost,
+    });
+    cost = side === "blue" ? ns.playerCost : ns.aiCost;
   }));
 
   const upd = side === "blue"
     ? { playerHand: hand, playerDeck: deck, playerCost: cost }
     : { aiHand: hand, aiDeck: deck, aiCost: cost };
-
-  let newState = { ...state, board, log, ...upd };
-
-  // 条件付き効果を最新の状態に対して適用
-  newState = applyConditionals(newState, side);
+  const newState = { ...state, board, log, ...upd, phase: "summon" };
+  applyConditionals(newState, side);
   return newState;
 }
 
-// ============ 召喚処理 ============
+// ===== 召喚 =====
 export function summonUnit(state, side, handIndex, col, insertIdx) {
   const hand = side === "blue" ? [...state.playerHand] : [...state.aiHand];
   const card = hand[handIndex];
   if (!card) return state;
+  if (state.board[side][col].length >= 3) return state;
 
   const cost = side === "blue" ? state.playerCost : state.aiCost;
   const grave = side === "blue" ? [...(state.playerGrave || [])] : [...(state.aiGrave || [])];
 
-  // コスト計算（パッシブ減少）
   const reduction = calcPassiveCostReduction(card, side, state.board, grave);
   const finalCost = Math.max(0, card.cost - reduction);
   if (cost < finalCost) return state;
 
   const board = cloneBoard(state.board);
   const log = [...state.log];
-  if (board[side][col].length >= 3) return state;
-
   const unit = makeUnitFromCard(card);
   unit.summonedTurn = state.turn;
+  if (!unit.tags?.includes("先制")) { unit.rotateDeg = -90; unit.acted = true; }
 
-  // 先制タグがなければ召喚時に反時計90度回転（行動済み扱い）
-  if (!unit.tags?.includes("先制")) {
-    unit.rotateDeg = -90;
-    unit.acted = true;
-  }
-
-  board[side][col].splice(Math.min(insertIdx, board[side][col].length), 0, unit);
+  const at = Math.min(insertIdx, board[side][col].length);
+  board[side][col].splice(at, 0, unit);
   hand.splice(handIndex, 1);
   log.push(`${card.name}を召喚`);
-
-  // 召喚時効果
-  if (card.effect?.trigger === "on_summon") {
-    const ctx = { board, side, col, idx: insertIdx, hand, grave, log };
-    const targets = resolveTargets(card.effect.target, ctx);
-    Object.assign(state, applyAction(card.effect, targets, ctx, { ...state, board, log }));
-  }
 
   const costUpd = side === "blue"
     ? { playerHand: hand, playerCost: cost - finalCost, playerGrave: grave }
     : { aiHand: hand, aiCost: cost - finalCost, aiGrave: grave };
-
   let ns = { ...state, board, log, ...costUpd };
-  ns = applyConditionals(ns, side);
 
-  const vc = checkVictory(board, state.turn);
-  return vc.over ? { ...ns, gameOver: vc.winner } : ns;
+  if (card.effect?.trigger === "on_summon") {
+    const ctx = { board, side, col, idx: at, hand, grave, log };
+    const targets = resolveTargets(card.effect.target, ctx);
+    ns = applyAction(card.effect, targets, ctx, ns);
+  }
+
+  const vc = checkVictory(ns.board, state.turn);
+  if (vc.over && !ns.gameOver) ns.gameOver = vc.winner;
+  applyConditionals(ns, side);
+  return ns;
 }
 
-// ============ 攻撃処理 ============
+// ===== 攻撃 =====
 export function attackUnit(state, side, atkCol, atkIdx, defCol, defIdx) {
   const enem = side === "blue" ? "red" : "blue";
   const board = cloneBoard(state.board);
   const log = [...state.log];
   const attacker = board[side][atkCol][atkIdx];
   const defender = board[enem][defCol][defIdx];
-  if (!attacker || !defender) return state;
+  if (!attacker || !defender || attacker.atk <= 0) return state;
 
-  const bonus = calcForgeBonus(side, atkCol, atkIdx, board);
-  const dmg = attacker.atk + bonus;
+  const dmg = attacker.atk + calcForgeBonus(side, atkCol, atkIdx, board);
   defender.hp -= dmg;
+  log.push(`${attacker.name}→${defender.name}に${dmg}ダメージ`);
+
+  // 行動消費・回転
   attacker.actCount = (attacker.actCount || 0) + 1;
   const has2act = attacker.tags?.includes("2回行動");
-  const hasRecoil = attacker.tags?.includes("反動");
-  if (has2act && attacker.actCount < 2) {
-    // 1回目はまだ行動可能
-  } else {
+  const recoil = attacker.tags?.includes("反動");
+  if (!(has2act && attacker.actCount < 2)) {
     attacker.acted = true;
-    const baseDeg = hasRecoil ? 180 : 90;
-    attacker.rotateDeg = (attacker.rotateDeg || 0) - baseDeg;
+    attacker.rotateDeg = (attacker.rotateDeg || 0) - (recoil ? 180 : 90);
   }
-  log.push(`${attacker.name}→${defender.name}に${dmg}ダメージ`);
+
+  let ns = { ...state, board, log };
 
   // 機械属リンク
   if (attacker.attr === "machine") {
     [[atkCol-1,atkIdx],[atkCol+1,atkIdx],[atkCol,atkIdx-1],[atkCol,atkIdx+1]].forEach(([c2,i2]) => {
       const u = board[side][c2]?.[i2];
-      if (!u || u.attr !== "machine" || !u.effect) return;
+      if (!u || u.attr !== "machine" || u.effect?.trigger !== "link_machine") return;
       const ctx = { board, side, col: c2, idx: i2, log };
-      const targets = resolveTargets(u.effect.trigger === "link_machine" ? u.effect.target : "self", ctx);
-      applyAction(u.effect, targets, ctx, state);
+      ns = applyAction(u.effect, resolveTargets(u.effect.target, ctx), ctx, ns);
     });
   }
 
   // 攻撃時効果
   if (attacker.effect?.trigger === "on_attack") {
     const ctx = { board, side, col: atkCol, idx: atkIdx, log, damageDealt: dmg };
-    const targets = resolveTargets(attacker.effect.target, ctx);
-    Object.assign(state, applyAction(attacker.effect, targets, ctx, { ...state, board, log }));
+    ns = applyAction(attacker.effect, resolveTargets(attacker.effect.target, ctx), ctx, ns);
   }
 
-  let ns = { ...state, board, log };
-
+  // 破壊
   if (defender.hp <= 0) {
-    // 破壊時効果
     if (defender.effect?.trigger === "on_death") {
       const ctx = { board, side: enem, col: defCol, idx: defIdx, log };
-      const targets = resolveTargets(defender.effect.target, ctx);
-      ns = applyAction(defender.effect, targets, ctx, ns);
+      ns = applyAction(defender.effect, resolveTargets(defender.effect.target, ctx), ctx, ns);
     }
     if (defender.isCore) ns.gameOver = side;
-    board[enem][defCol].splice(defIdx, 1);
+    const di = board[enem][defCol].indexOf(defender);
+    if (di >= 0) board[enem][defCol].splice(di, 1);
   }
 
   const vc = checkVictory(board, state.turn);
   if (vc.over && !ns.gameOver) ns.gameOver = vc.winner;
-
-  ns = applyConditionals(ns, side);
+  applyConditionals(ns, side);
   return ns;
 }
 
-// ============ スペル/魔法発動 ============
+// ===== スペル/魔法 =====
 export function activateCard(state, side, handIndex, targetInfo) {
   const hand = side === "blue" ? [...state.playerHand] : [...state.aiHand];
   const card = hand[handIndex];
@@ -297,42 +271,34 @@ export function activateCard(state, side, handIndex, targetInfo) {
   if (cost < card.cost) return state;
 
   const board = cloneBoard(state.board);
-  const log = [...state.log];
+  const log = [...state.log, `${card.name}を使用`];
   const grave = side === "blue" ? [...(state.playerGrave || [])] : [...(state.aiGrave || [])];
-
-  log.push(`${card.name}を使用`);
-
   const ctx = { board, side, col: targetInfo?.col, idx: targetInfo?.idx, hand, grave, log, selectedTarget: targetInfo };
 
-  let targets = [];
   const e = card.effect;
+  let targets = [];
   if (e) {
-    if (targetInfo && e.target?.startsWith("select_")) {
-      targets = [{ side: targetInfo.side, col: targetInfo.col, idx: targetInfo.idx }];
-    } else {
-      targets = resolveTargets(e.target || "self", ctx);
-    }
+    targets = (targetInfo && e.target?.startsWith("select_"))
+      ? [{ side: targetInfo.side, col: targetInfo.col, idx: targetInfo.idx }]
+      : resolveTargets(e.target || "self", ctx);
   }
 
-  const costAfterPay = side === "blue"
-    ? { playerCost: cost - card.cost }
-    : { aiCost: cost - card.cost };
+  // コストを先に支払った状態で効果を適用
+  const paid = side === "blue" ? { playerCost: cost - card.cost } : { aiCost: cost - card.cost };
+  let ns = applyAction(e || {}, targets, ctx, { ...state, board, log, ...paid });
 
-  let ns = applyAction(e || {}, targets, ctx, { ...state, board, log, ...costAfterPay });
-
+  // スペルは使用後に手札から墓地へ（効果で変化した手札・墓地を保持）
   if (card.type === "spell") {
-    hand.splice(handIndex, 1);
-    grave.push(card);
+    const hk = side === "blue" ? "playerHand" : "aiHand";
+    const gk = side === "blue" ? "playerGrave" : "aiGrave";
+    const h = [...ns[hk]];
+    const hi = h.findIndex(c => c._k === card._k);
+    if (hi >= 0) h.splice(hi, 1);
+    ns = { ...ns, [hk]: h, [gk]: [...(ns[gk] || []), card] };
   }
 
-  const costUpd = side === "blue"
-    ? { playerHand: hand, playerGrave: grave }
-    : { aiHand: hand, aiGrave: grave };
-
-  ns = { ...ns, ...costUpd };
-  const vc = checkVictory(board, state.turn);
+  const vc = checkVictory(ns.board, state.turn);
   if (vc.over && !ns.gameOver) ns.gameOver = vc.winner;
-
-  ns = applyConditionals(ns, side);
+  applyConditionals(ns, side);
   return ns;
-}
+               }
