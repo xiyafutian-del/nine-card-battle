@@ -267,4 +267,9 @@ card(1201, "盾兵", 2, 5, 1, "1.1", "unit", "eu", {
     { effect:{ trigger:"activate", action:"growth", filter:{ attr:"fish" }, maxCost:8 },
       tags:["成長8(魚)","先制"], desc:"手札の魚属性コスト8以下を召喚" }),
   card(3209, "クジラ", 98, 9, 3,"3.2", "unit", "fish"),
+  card(63, "冷却器", 2, 0, 0, "1.1", "magic", "machine",
+  { effect:{ trigger:"activate", target:"select_ally", action:"unrotate" },
+    targetType:"ally_machine", desc:"機械属1体を行動可能にする" }),
+card(64, "暴走機関", 4, 5, 5, "1.2", "unit", "machine",
+  { tags:["オーバークロック"], desc:"発動で追加行動。ターン終了時に破壊" }),
 ];
