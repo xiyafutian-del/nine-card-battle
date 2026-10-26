@@ -5,7 +5,8 @@ import { HandFan } from '../components/HandFan.jsx';
 import { rowToCoord } from '../engine/battle.js';
 import { GENERATOR_INFO } from '../constants/index.js';
 
-const PHASES = [["summon", "召喚"], ["move", "移動"], ["attack", "攻撃"]];
+const PHASE_LABEL = { summon: "召喚", move: "移動", attack: "攻撃" };
+const isSpellCard = c => c.type === "spell" || c.type === "magic";
 
 export function BattleScreen({
   battle, confirmLeave,
@@ -20,7 +21,6 @@ export function BattleScreen({
   const isGameOver = gameOver !== null && gameOver !== undefined;
   const turn1block = turn === 1 && active === firstPlayer;
 
-  // 自分視点のサイド
   const viewSide = isPvp ? myColor : mode === "solo" ? active : "blue";
   const myHand  = viewSide === "blue" ? battle.playerHand : battle.aiHand;
   const myCost  = viewSide === "blue" ? battle.playerCost : battle.aiCost;
@@ -46,12 +46,14 @@ export function BattleScreen({
   function handleDragOver(e, row, col) {
     e.preventDefault();
     const dc = dragRef.current;
-    if (!dc || phase !== "summon") { setDropPreview(null); return; }
+    if (!dc) return;
+    // 魔法・スペルは盤面のどこにドロップしてもOK
+    if (isSpellCard(dc.card)) { setDropPreview(null); return; }
+    if (phase !== "summon") { setDropPreview(null); return; }
     const { side, idx } = rowToCoord(row);
     if (side !== active || myCost < dc.card.cost) { setDropPreview(null); return; }
     const len = board[active][col].length;
     if (len >= 3) { setDropPreview(null); return; }
-    // ユニットは最後尾、施設は指定位置
     setDropPreview({ col, insertIdx: dc.card.type === "facility" ? Math.min(idx, len) : len });
   }
   function handleDragLeave(e) {
@@ -67,14 +69,6 @@ export function BattleScreen({
     setDraggingCard(null); dragRef.current = null;
   }
 
-  function handleSpellActivate(handIndex) {
-    const card = myHand[handIndex];
-    if (!card) return;
-    if (!card.targetType || card.targetType === "none") onSummon(handIndex, -1, -1);
-    else onCellClick(-1, -1, { spell: true, handIndex, card });
-  }
-
-  // 盤面外（背景）タップで選択キャンセル
   const cancelIfBackground = e => { if (e.target === e.currentTarget) onCellClick(-1, -1); };
 
   let resultText = null;
@@ -85,13 +79,13 @@ export function BattleScreen({
     else resultText = gameOver === "blue" ? "🔵側の勝利！" : "🔴側の勝利！";
   }
 
-  let guideText;
+  let guideText = "";
   if (isGameOver) guideText = "";
   else if (handDisabled) guideText = "相手のターン…";
   else if (selectedSpell) guideText = `${selectedSpell.card.name}: 対象をタップ`;
   else if (selectedGrowth) guideText = "成長で出す手札のカードをタップ";
-  else if (draggingCard) guideText = "＋マスへドロップ（ユニットは最後尾）";
-  else if (phase === "summon") guideText = "ドラッグで召喚 / 成長施設タップ / 魔法はタップ";
+  else if (draggingCard) guideText = isSpellCard(draggingCard.card) ? "盤面にドロップで使用" : "＋マスへドロップ（ユニットは最後尾）";
+  else if (phase === "summon") guideText = "";
   else if (turn1block) guideText = "先行1T目は移動・攻撃不可";
   else if (selectedUnit) guideText = phase === "move" ? "緑=移動先 / 他タップでキャンセル" : "橙=攻撃先 / 他タップでキャンセル";
   else guideText = phase === "move" ? "動かすユニットをタップ" : "攻撃するユニットをタップ";
@@ -149,19 +143,7 @@ export function BattleScreen({
           />
         </div>
 
-        {/* フェーズ表示 */}
-        {!isGameOver && (
-          <div className="flex gap-1 px-1 mt-1 flex-shrink-0">
-            {PHASES.map(([k, label]) => (
-              <div key={k}
-                className={`flex-1 text-center text-xs py-0.5 border ${phase === k ? "border-black bg-black text-white font-bold" : "border-gray-300 text-gray-400"}`}>
-                {label}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* ガイド + フェーズ進行 */}
+        {/* ガイド + フェーズ進行ボタン */}
         <div className="flex items-center gap-2 px-1 my-1 flex-shrink-0 min-h-8">
           {isGameOver ? (
             <div className="flex-1 text-center">
@@ -172,7 +154,8 @@ export function BattleScreen({
             <>
               <div className="flex-1 text-xs text-gray-600 text-center">{guideText}</div>
               <button
-                onClick={phase === "attack" ? onEndTurn : onNextPhase}
+                type="button"
+                onClick={e => { e.stopPropagation(); (phase === "attack" ? onEndTurn : onNextPhase)(); }}
                 disabled={handDisabled}
                 className="bg-white border border-black font-bold px-3 py-1 text-xs disabled:opacity-40 flex-shrink-0">
                 {phase === "summon" ? "移動へ" : phase === "move" ? "攻撃へ" : "ターン終了"}
@@ -181,21 +164,24 @@ export function BattleScreen({
           )}
         </div>
 
-        {/* 自分情報 */}
+        {/* 自分情報: コスト と 手数 の間に現在のフェーズ */}
         <div className="flex items-center gap-2 px-1 flex-shrink-0 mb-1">
           <span className="font-bold text-xs">あなた</span>
           <span className="flex items-center gap-1 font-mono text-xs">
             <Zap size={10}/>{myCost}
             <span className="text-gray-400 font-normal" style={{ fontSize: "0.6rem" }}>({genInfo.name})</span>
           </span>
-          <span className="text-gray-400 text-xs ml-auto">手{myHand.length}</span>
+          <span className="flex-1 text-center text-xs font-bold">
+            {!isGameOver && `${PHASE_LABEL[phase]}フェーズ`}
+          </span>
+          <span className="text-gray-400 text-xs">手{myHand.length}</span>
         </div>
 
         {/* 手札 */}
         <HandFan
           hand={myHand} handCost={myCost} handDisabled={handDisabled}
           isGameOver={isGameOver} cardImages={cardImages} phase={phase}
-          onSummon={onSummon} onSpellActivate={handleSpellActivate}
+          onSummon={onSummon}
           onDragStart={handleDragStart} onDragEnd={handleDragEnd}
           selectedGrowth={selectedGrowth} onGrowthSelect={onGrowthSelect}
         />
