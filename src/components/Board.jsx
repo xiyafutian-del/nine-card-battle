@@ -49,9 +49,12 @@ export function Board({
   }
   if (selectedGrowth) selSet.add(`${active}-${selectedGrowth.col}-${selectedGrowth.idx}`);
 
-  // 対象指定スペルの対象候補
-  if (selectedSpell) {
-    const t = selectedSpell.card.targetType;
+    // 対象指定スペルの対象候補（選択中 または ドラッグ中）
+  const dragSpell = draggingCard && (draggingCard.card.type === "spell" || draggingCard.card.type === "magic")
+    ? draggingCard.card : null;
+  const spellCard = selectedSpell?.card || dragSpell;
+  if (spellCard) {
+    const t = spellCard.targetType;
     ["blue", "red"].forEach(s => board[s].forEach((colArr, c) => colArr.forEach((u, i) => {
       if (!u) return;
       const ally = s === active;
@@ -66,7 +69,7 @@ export function Board({
 
   // ドロップ可能マス: ユニット=最後尾の1マス / 施設=列内どこでも
   const dropableSet = new Set();
-  if (draggingCard && phase === "summon") {
+    if (draggingCard && !dragSpell && phase === "summon") {
     const isFac = draggingCard.card.type === "facility";
     for (let c = 0; c < 3; c++) {
       const len = board[active][c].length;
