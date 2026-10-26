@@ -4,13 +4,12 @@ import { TYPES } from '../constants/index.js';
 
 export function HandFan({
   hand, handCost, handDisabled, isGameOver, phase,
-  cardImages, onSummon, onSpellActivate,
+  cardImages, onSummon,
   onDragStart, onDragEnd,
   selectedGrowth, onGrowthSelect,
 }) {
   const swipeRef = useRef({ startX: 0, startY: 0, idx: null, dragging: false });
 
-  // 成長選択中の条件
   const inGrowthMode = !!selectedGrowth;
   const gEffect = selectedGrowth?.unit?.effect;
   const gAttrs = gEffect
@@ -34,7 +33,6 @@ export function HandFan({
     if (s.idx == null) return;
     if (s.dragging) {
       const t = e.changedTouches[0];
-      // 指を離した位置のマスを取得（反転盤面でも論理行・列が取れる）
       const cell = document.elementFromPoint(t.clientX, t.clientY)?.closest?.('[data-cell]');
       if (cell) onSummon(s.idx, Number(cell.dataset.row), Number(cell.dataset.col));
     }
@@ -49,7 +47,7 @@ export function HandFan({
       {hand.map((card, i) => {
         const isSpellMagic = card.type === TYPES.SPELL || card.type === TYPES.MAGIC;
         const isGrowthTarget = inGrowthMode && gAttrs.includes(card.attr) && card.cost <= gMax;
-        // スペル・魔法はいつでも、ユニット・施設は召喚フェーズのみ
+        // 魔法・スペルはいつでも、ユニット・施設は召喚フェーズのみ（全てドラッグで使用）
         const phaseOk = isSpellMagic || phase === "summon";
         const affordable = !inGrowthMode && handCost >= card.cost && !handDisabled && !isGameOver && phaseOk;
         const usable = inGrowthMode ? isGrowthTarget : affordable;
@@ -62,15 +60,14 @@ export function HandFan({
         return (
           <div
             key={card._k || i}
-            draggable={affordable && !isSpellMagic}
+            draggable={affordable}
             onClick={e => {
               e.stopPropagation();
-              if (inGrowthMode) { if (isGrowthTarget) onGrowthSelect(i); return; }
-              if (affordable && isSpellMagic) onSpellActivate(i);
+              if (inGrowthMode && isGrowthTarget) onGrowthSelect(i);
             }}
             onDragStart={e => onDragStart(e, i, card)}
             onDragEnd={onDragEnd}
-            onTouchStart={e => { if (affordable && !isSpellMagic) handTouchStart(e, i); }}
+            onTouchStart={e => { if (affordable) handTouchStart(e, i); }}
             onTouchMove={handTouchMove}
             onTouchEnd={handTouchEnd}
             className={`absolute bottom-0 ${usable ? "cursor-grab active:cursor-grabbing" : ""}`}
