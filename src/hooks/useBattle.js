@@ -6,6 +6,7 @@ import { cloneBoard, buildDeck, checkVictory, applyTurnStart,
          getAttackTargets, getMovable, rowToCoord } from '../engine/battle.js';
 import { runAITurn } from '../engine/ai.js';
 
+// 対象指定スペルの有効対象判定（ドロップ時・タップ時で共通）
 function isValidSpellTarget(card, active, side, unit) {
   if (!unit) return false;
   const ally = side === active;
@@ -18,6 +19,7 @@ function isValidSpellTarget(card, active, side, unit) {
     default:              return false;
   }
 }
+
 const findSkin = (deckSkins, ownedSkins, key) => {
   const id = deckSkins?.[key];
   return id ? (ownedSkins || []).find(s => s.instanceId === id) || null : null;
@@ -159,7 +161,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
       if (!prev || prev.gameOver) return prev;
       if (prev.mode === "pve" && prev.active === "red") return prev;
 
-      // 盤面外: 手札の対象指定スペルを選択状態に / それ以外は全キャンセル
+      // 盤面外タップ: 全選択キャンセル（extra.spell は対象選択状態へ）
       if (row === -1) {
         if (extra?.spell) {
           return { ...prev, selectedSpell: { handIndex: extra.handIndex, card: extra.card },
@@ -190,13 +192,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
       // スペル対象指定中
       if (selectedSpell) {
         const { handIndex, card } = selectedSpell;
-        if (!tapped) return { ...prev, selectedSpell: null };
-        const t = card.targetType;
-        if (t === "enemy" && side !== enem) return { ...prev, selectedSpell: null };
-        if (t === "enemy_noncore" && (side !== enem || tapped.isCore)) return { ...prev, selectedSpell: null };
-        if (t === "ally" && side !== active) return { ...prev, selectedSpell: null };
-        if (t === "ally_wall" && (side !== active || tapped.attr !== "wall")) return { ...prev, selectedSpell: null };
-        if (t === "ally_machine" && (side !== active || tapped.attr !== "machine")) return { ...prev, selectedSpell: null };
+        if (!isValidSpellTarget(card, active, side, tapped)) return { ...prev, selectedSpell: null };
         const ns = activateCard(prev, active, handIndex, { side, col, idx });
         push();
         return { ...ns, selectedSpell: null };
@@ -300,7 +296,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
     });
   }
 
-  // ===== 召喚・スペル発動 =====
+  // ===== 召喚・スペル発動（手札からのドロップ） =====
   function handleSummon(handIndex, row, col) {
     setBattle(prev => {
       if (!prev || prev.gameOver) return prev;
@@ -311,13 +307,25 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
       if (!card) return prev;
       const isSpell = card.type === "spell" || card.type === "magic";
 
-      // スペル・魔法はいつでも
+      // スペル・魔法はいつでも（盤面へのドロップで使用）
       if (isSpell) {
+        // 対象なし: 盤面のどこにドロップしても発動
         if (!card.targetType || card.targetType === "none") {
           const ns = activateCard(prev, active, handIndex, null);
           push();
           return ns;
         }
+        // 対象あり: ドロップ先が有効な対象ならそのまま発動
+        if (row >= 0) {
+          const { side, idx } = rowToCoord(row);
+          const target = prev.board[side]?.[col]?.[idx];
+          if (isValidSpellTarget(card, active, side, target)) {
+            const ns = activateCard(prev, active, handIndex, { side, col, idx });
+            push();
+            return ns;
+          }
+        }
+        // 対象以外にドロップ: 対象選択（タップ）へ
         return { ...prev, selectedSpell: { handIndex, card }, selectedUnit: null, selectedGrowth: null };
       }
 
@@ -342,4 +350,4 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
     handleCellClick, handleSummon, handleGrowthSelect,
     setConfirmLeave, setBattle,
   };
-                               }
+                   }
