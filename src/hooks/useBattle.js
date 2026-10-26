@@ -6,6 +6,18 @@ import { cloneBoard, buildDeck, checkVictory, applyTurnStart,
          getAttackTargets, getMovable, rowToCoord } from '../engine/battle.js';
 import { runAITurn } from '../engine/ai.js';
 
+function isValidSpellTarget(card, active, side, unit) {
+  if (!unit) return false;
+  const ally = side === active;
+  switch (card.targetType) {
+    case "enemy":         return !ally;
+    case "enemy_noncore": return !ally && !unit.isCore;
+    case "ally":          return ally;
+    case "ally_wall":     return ally && unit.attr === "wall";
+    case "ally_machine":  return ally && unit.attr === "machine";
+    default:              return false;
+  }
+}
 const findSkin = (deckSkins, ownedSkins, key) => {
   const id = deckSkins?.[key];
   return id ? (ownedSkins || []).find(s => s.instanceId === id) || null : null;
