@@ -13,6 +13,11 @@ import { getDeckSkins, getOwnedSkins } from './skins/skinManager.js';
 
 const DECK_SIZE = 15;
 
+// 相手の不在秒数のしきい値
+const ABSENT_NOTICE = 10;   // 「確認中」を表示
+const ABSENT_GONE = 30;     // 「切断」と表示
+const ABSENT_CLAIM = 60;    // 勝利して終了できる
+
 function loadActiveDeck() {
   try {
     const saved = localStorage.getItem("activeDeck");
@@ -31,7 +36,6 @@ export default function App() {
   const deckName = activeDeck?.name || "noname";
   const deckTotal = Object.values(deckCounts).reduce((a, b) => a + b, 0);
 
-  // 15枚ちょうどでなければ対戦不可
   function deckOk() {
     if (deckTotal !== DECK_SIZE) {
       alert(`デッキが${deckTotal}枚です。${DECK_SIZE}枚ちょうどにしてください`);
@@ -95,7 +99,7 @@ export default function App() {
 
   const {
     roomId, inputRoomId, setInputRoomId,
-    pvpRole, pvpStatus, error,
+    pvpRole, pvpStatus, error, absentSec,
     createRoom, joinRoom, pushState, leaveRoom,
   } = usePVP(handlePVPStateUpdate);
 
@@ -135,7 +139,8 @@ export default function App() {
     if (!deckOk()) return;
     const myDeck = withSkins(buildDeck(cardPool, deckCounts));
     const myHand = myDeck.splice(0, 4);
-    const state = await joinRoom(id, myDeck, myHand);
+    // ゲストの発電機もホストへ送る
+    const state = await joinRoom(id, myDeck, myHand, playerGenerator);
     if (state) {
       const cs = coreSkin();
       if (cs && state.board?.red?.[1]?.[0]) state.board.red[1][0].skin = cs;
@@ -175,23 +180,50 @@ export default function App() {
   const isPvp = battle?.mode === "pvp";
   const myTurn = !isPvp || battle.active === myColor;
 
+  // 相手の切断により勝利して終了
+  function claimWin() {
+    setBattle(prev => prev
+      ? { ...prev, gameOver: myColor, log: [...prev.log, "相手の切断により勝利"] }
+      : prev);
+    setTimeout(handleAction, 100);
+  }
+
   if (screen === "battle" && battle) {
+    const showAbsent = isPvp && !battle.gameOver && absentSec >= ABSENT_NOTICE;
     return (
-      <BattleScreen
-        battle={battle} confirmLeave={confirmLeave}
-        onRequestBack={handleRequestBack}
-        onLeaveToLobby={handleLeaveToLobby}
-        onEndTurn={isPvp ? () => { if (myTurn) endTurn(); } : endTurn}
-        onNextPhase={isPvp ? () => { if (myTurn) nextPhase(); } : nextPhase}
-        onCellClick={isPvp
-          ? (row, col, extra) => { if (myTurn || row === -1) handleCellClick(row, col, extra); }
-          : handleCellClick}
-        onSummon={isPvp ? (hi, row, col) => { if (myTurn) handleSummon(hi, row, col); } : handleSummon}
-        onGrowthSelect={isPvp ? hi => { if (myTurn) handleGrowthSelect(hi); } : handleGrowthSelect}
-        onSetConfirmLeave={setConfirmLeave}
-        cardImages={cardImages}
-        pvpRole={pvpRole}
-      />
+      <>
+        <BattleScreen
+          battle={battle} confirmLeave={confirmLeave}
+          onRequestBack={handleRequestBack}
+          onLeaveToLobby={handleLeaveToLobby}
+          onEndTurn={isPvp ? () => { if (myTurn) endTurn(); } : endTurn}
+          onNextPhase={isPvp ? () => { if (myTurn) nextPhase(); } : nextPhase}
+          onCellClick={isPvp
+            ? (row, col, extra) => { if (myTurn || row === -1) handleCellClick(row, col, extra); }
+            : handleCellClick}
+          onSummon={isPvp ? (hi, row, col) => { if (myTurn) handleSummon(hi, row, col); } : handleSummon}
+          onGrowthSelect={isPvp ? hi => { if (myTurn) handleGrowthSelect(hi); } : handleGrowthSelect}
+          onSetConfirmLeave={setConfirmLeave}
+          cardImages={cardImages}
+          pvpRole={pvpRole}
+        />
+        {showAbsent && (
+          <div className="fixed top-0 left-0 right-0 z-[60] pointer-events-none">
+            <div className="mx-auto max-w-sm bg-black text-white text-xs text-center py-2 px-3">
+              {absentSec < ABSENT_GONE
+                ? `相手の接続を確認中…（${absentSec}秒）`
+                : `相手が切断しました。復帰を待っています（${absentSec}秒）`}
+              {absentSec >= ABSENT_CLAIM && (
+                <button
+                  onClick={claimWin}
+                  className="pointer-events-auto ml-2 bg-white text-black font-bold px-2 py-0.5">
+                  勝利して終了
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </>
     );
   }
   if (screen === "deck") {
