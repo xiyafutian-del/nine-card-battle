@@ -82,7 +82,7 @@ export function getMovable(side, col, idx, board) {
   [[0,-1],[0,1],[-1,0],[1,0]].forEach(([dc, di]) => {
     const nc = col + dc, ni = idx + di;
     if (nc < 0 || nc > 2 || ni < 0 || ni > 2) return;
-    if (dc === 0) result.push({ col: nc, idx: ni });
+    if (dc === 0) { if (ni < board[side].length && ni < board[side][col].length) result.push({ col: nc, idx: ni }); }
     else if (board[side][nc].length < 3)
       result.push({ col: nc, idx: Math.min(ni, board[side][nc].length) });
   });
