@@ -25,6 +25,9 @@ const findSkin = (deckSkins, ownedSkins, key) => {
   return id ? (ownedSkins || []).find(s => s.instanceId === id) || null : null;
 };
 
+// フェーズは「召喚 → 行動（移動・攻撃）」の2段階。戻れない
+const PHASE_ORDER = ["summon", "action"];
+
 function initBattle(mode, cardPool, deckCounts, playerGenerator, deckSkins, ownedSkins, deckName) {
   const name = deckName || "noname";
   const pDeck = buildDeck(cardPool, deckCounts);
@@ -111,10 +114,9 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
   function nextPhase() {
     setBattle(prev => {
       if (!prev || prev.gameOver) return prev;
-      const order = ["summon", "move", "attack"];
-      const i = order.indexOf(prev.phase || "summon");
-      if (i >= 2) return prev;
-      return { ...prev, phase: order[i + 1], selectedUnit: null, selectedSpell: null, selectedGrowth: null };
+      const i = PHASE_ORDER.indexOf(prev.phase || "summon");
+      if (i < 0 || i >= PHASE_ORDER.length - 1) return prev;
+      return { ...prev, phase: PHASE_ORDER[i + 1], selectedUnit: null, selectedSpell: null, selectedGrowth: null };
     });
     push();
   }
@@ -204,9 +206,9 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
         const attacker = prev.board[active][su.col]?.[su.idx];
         if (!attacker) return { ...prev, selectedUnit: null };
 
-        // 攻撃（攻撃フェーズのみ）
+        // 攻撃（行動フェーズ）
         if (side === enem) {
-          if (phase === "attack") {
+          if (phase === "action") {
             const valid = getAttackTargets(active, su.col, su.idx, attacker, prev.board);
             if (valid.some(t => t.col === col && t.idx === idx)) {
               const ns = attackUnit(prev, active, su.col, su.idx, col, idx);
@@ -218,13 +220,14 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
         }
 
         if (side === active) {
-          // 移動（移動フェーズのみ・1回）
-          if (phase === "move" && !attacker.moved) {
+          // 移動（行動フェーズ・1回のみ）
+          if (phase === "action" && !attacker.moved) {
             const movable = getMovable(active, su.col, su.idx, prev.board);
             if (movable.some(m => m.col === col && m.idx === idx)) {
               const board = cloneBoard(prev.board);
               const unit = board[active][su.col].splice(su.idx, 1)[0];
               unit.moved = true;
+              // 速攻持ちは移動しても回転・行動済みにならない
               if (!unit.tags?.includes("速攻")) {
                 unit.acted = true;
                 unit.rotateDeg = (unit.rotateDeg || 0) - 90;
@@ -250,7 +253,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
       if (growthOk) return { ...prev, selectedGrowth: { col, idx, unit: tapped }, selectedUnit: null };
       if (selectedGrowth) return { ...prev, selectedGrowth: null };
 
-      // 新規選択（移動・攻撃フェーズ）
+      // 新規選択（行動フェーズ）
       if (side === active && tapped && !tapped.acted && !tapped.stunned && !turn1block && phase !== "summon")
         return { ...prev, selectedUnit: { col, idx } };
 
@@ -350,4 +353,4 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
     handleCellClick, handleSummon, handleGrowthSelect,
     setConfirmLeave, setBattle,
   };
-                   }
+                                       }
