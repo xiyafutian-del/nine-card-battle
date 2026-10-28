@@ -104,8 +104,11 @@ export function applyAction(effect, targets, ctx, state) {
       break;
 
     case "atk_up":
-      targets.forEach(t => { const u = s.board[t.side][t.col][t.idx]; if (u) u.atk += effect.amount; });
-      break;
+  targets.forEach(t => {
+    const u = s.board[t.side][t.col][t.idx];
+    if (u) { u.atk += effect.amount; if (u.baseAtk != null) u.baseAtk += effect.amount; }
+  });
+  break;
 
     case "atk_up_temp":
       targets.forEach(t => { const u = s.board[t.side][t.col][t.idx]; if (u) { u.atk += effect.amount; u.atkTempUp = (u.atkTempUp || 0) + effect.amount; } });
@@ -359,7 +362,7 @@ export function applyConditionals(state, side) {
         if (!unit?.conditional) return;
 
         // ベース値にリセット
-        unit.atk    = unit.baseAtk ?? unit.atk;
+        unit.atk    = unit.baseAtk + (unit.atkTempUp || 0);
         unit.vRange = unit.baseVRange ?? unit.vRange ?? 1;
         unit.hRange = unit.baseHRange ?? unit.hRange ?? 1;
         unit.dRange = unit.baseDRange ?? unit.dRange ?? 1;
