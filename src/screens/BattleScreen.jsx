@@ -5,7 +5,7 @@ import { HandFan } from '../components/HandFan.jsx';
 import { rowToCoord } from '../engine/battle.js';
 import { GENERATOR_INFO } from '../constants/index.js';
 
-const PHASE_LABEL = { summon: "召喚", move: "移動", attack: "攻撃" };
+const PHASE_LABEL = { summon: "召喚", action: "行動" };
 const isSpellCard = c => c.type === "spell" || c.type === "magic";
 
 export function BattleScreen({
@@ -15,7 +15,7 @@ export function BattleScreen({
   cardImages, pvpRole,
 }) {
   const { board, active, mode, gameOver, turn, firstPlayer, selectedUnit, selectedSpell, selectedGrowth } = battle;
-  const phase = battle.phase || "summon";
+  const phase = battle.phase === "action" ? "action" : "summon";
   const isPvp = mode === "pvp";
   const myColor = pvpRole === "guest" ? "red" : "blue";
   const isGameOver = gameOver !== null && gameOver !== undefined;
@@ -87,8 +87,8 @@ export function BattleScreen({
   else if (draggingCard) guideText = isSpellCard(draggingCard.card) ? "盤面にドロップで使用" : "＋マスへドロップ（ユニットは最後尾）";
   else if (phase === "summon") guideText = "";
   else if (turn1block) guideText = "先行1T目は移動・攻撃不可";
-  else if (selectedUnit) guideText = phase === "move" ? "緑=移動先 / 他タップでキャンセル" : "橙=攻撃先 / 他タップでキャンセル";
-  else guideText = phase === "move" ? "動かすユニットをタップ" : "攻撃するユニットをタップ";
+  else if (selectedUnit) guideText = "緑=移動先 / 橙=攻撃先 / 他タップでキャンセル";
+  else guideText = "行動するユニットをタップ";
 
   const turnLabel = isPvp
     ? (active === myColor ? "あなたの番" : "相手の番")
@@ -155,16 +155,16 @@ export function BattleScreen({
               <div className="flex-1 text-xs text-gray-600 text-center">{guideText}</div>
               <button
                 type="button"
-                onClick={e => { e.stopPropagation(); (phase === "attack" ? onEndTurn : onNextPhase)(); }}
+                onClick={e => { e.stopPropagation(); (phase === "action" ? onEndTurn : onNextPhase)(); }}
                 disabled={handDisabled}
                 className="bg-white border border-black font-bold px-3 py-1 text-xs disabled:opacity-40 flex-shrink-0">
-                {phase === "summon" ? "移動へ" : phase === "move" ? "攻撃へ" : "ターン終了"}
+                {phase === "summon" ? "行動へ" : "ターン終了"}
               </button>
             </>
           )}
         </div>
 
-        {/* 自分情報: コスト と 手数 の間に現在のフェーズ */}
+        {/* 自分情報: コストと手数の間に現在のフェーズ */}
         <div className="flex items-center gap-2 px-1 flex-shrink-0 mb-1">
           <span className="font-bold text-xs">あなた</span>
           <span className="flex items-center gap-1 font-mono text-xs">
@@ -195,4 +195,4 @@ export function BattleScreen({
       </div>
     </div>
   );
-}
+          }
