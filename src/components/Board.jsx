@@ -25,16 +25,15 @@ export function Board({
   const growthSet = new Set();
   const spellSet = new Set();
 
-  // 選択ユニット: 攻撃フェーズ=攻撃先 / 移動フェーズ=移動先
+  // 選択ユニット: 行動フェーズでは移動先（緑）と攻撃先（橙）を同時に表示
   if (selectedUnit && !turn1block) {
     const su = selectedUnit;
     const att = board[active][su.col]?.[su.idx];
     selSet.add(`${active}-${su.col}-${su.idx}`);
-    if (att) {
-      if (phase === "attack")
-        getAttackTargets(active, su.col, su.idx, att, board)
-          .forEach(t => attackSet.add(`${enem}-${t.col}-${t.idx}`));
-      if (phase === "move" && !att.moved)
+    if (att && phase === "action") {
+      getAttackTargets(active, su.col, su.idx, att, board)
+        .forEach(t => attackSet.add(`${enem}-${t.col}-${t.idx}`));
+      if (!att.moved)
         getMovable(active, su.col, su.idx, board)
           .forEach(m => moveSet.add(`${active}-${m.col}-${m.idx}`));
     }
@@ -49,7 +48,7 @@ export function Board({
   }
   if (selectedGrowth) selSet.add(`${active}-${selectedGrowth.col}-${selectedGrowth.idx}`);
 
-    // 対象指定スペルの対象候補（選択中 または ドラッグ中）
+  // 対象指定スペルの対象候補（選択中 または ドラッグ中）
   const dragSpell = draggingCard && (draggingCard.card.type === "spell" || draggingCard.card.type === "magic")
     ? draggingCard.card : null;
   const spellCard = selectedSpell?.card || dragSpell;
@@ -69,7 +68,7 @@ export function Board({
 
   // ドロップ可能マス: ユニット=最後尾の1マス / 施設=列内どこでも
   const dropableSet = new Set();
-    if (draggingCard && !dragSpell && phase === "summon") {
+  if (draggingCard && !dragSpell && phase === "summon") {
     const isFac = draggingCard.card.type === "facility";
     for (let c = 0; c < 3; c++) {
       const len = board[active][c].length;
@@ -152,11 +151,11 @@ export function Board({
       <div className="flex flex-col justify-between flex-shrink-0" style={{ width: "36px" }}>
         <div className="flex flex-col gap-1">
           <SideBox label="デッキ" count={flipped ? playerDeck : aiDeck}/>
-          <SideBox label="墓地" count={(flipped ? playerGrave : aiGrave || []).length}/>
+          <SideBox label="墓地" count={((flipped ? playerGrave : aiGrave) || []).length}/>
         </div>
         <div className="text-center text-gray-400" style={{ fontSize: "0.5rem" }}>前<br/>線</div>
         <div className="flex flex-col gap-1">
-          <SideBox label="墓地" count={(flipped ? aiGrave : playerGrave || []).length}/>
+          <SideBox label="墓地" count={((flipped ? aiGrave : playerGrave) || []).length}/>
           <SideBox label="デッキ" count={flipped ? aiDeck : playerDeck}/>
         </div>
       </div>
