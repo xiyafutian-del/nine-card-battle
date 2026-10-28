@@ -1,127 +1,90 @@
-
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, memo } from 'react';
 import { drawMetalFrame } from '../skins/metalTexture.js';
-// gemTexture が未実装の場合のエラー回避用フォールバック
-import * as gemModule from '../skins/gemTexture.js';
-const drawGemFrame = gemModule.drawGemFrame || drawMetalFrame;
+import { drawGemFrame } from '../skins/gemTexture.js';
 
-// ドーナツ形状（外側角丸 - 内側角丸）で切り抜いてテクスチャを描画する関数
-function renderFrameOnly(canvas, skin, W, H, F, R) {
-  const ctx = canvas.getContext("2d");
-  canvas.width  = W;
-  canvas.height = H;
-  ctx.clearRect(0, 0, W, H);
+// カードの黒枠 + 約1pt
+const FRAME_PX = 3;
 
-  ctx.save();
-  ctx.beginPath();
+// テクスチャは固定の小さいサイズで1回だけ生成してキャッシュ
+const MASTER_W = 120;
+const MASTER_H = 174;
+const masterCache = new Map();
 
-  // 1. 外側の角丸パス
-  if (ctx.roundRect) {
-    ctx.roundRect(0, 0, W, H, R);
-  } else {
-    ctx.rect(0, 0, W, H);
-  }
-
-  // 2. 内側の角丸パス（枠幅 F だけ内側）
-  const innerW = Math.max(0, W - F * 2);
-  const innerH = Math.max(0, H - F * 2);
-  const innerR = Math.max(0, R - F);
-
-  if (ctx.roundRect) {
-    ctx.roundRect(F, F, innerW, innerH, innerR);
-  } else {
-    ctx.rect(F, F, innerW, innerH);
-  }
-
-  // 3. 枠部分（外側と内側の間）だけをクリップ領域に指定
-  ctx.clip('evenodd');
-
-  // 4. クリップ領域にのみテクスチャを描画
-  if (skin.type === "metal") {
-    drawMetalFrame(canvas, skin.seed, W, H, ctx);
-  } else if (skin.type === "gem") {
-    drawGemFrame(canvas, skin.seed, W, H, ctx);
-  }
-
-  ctx.restore();
+function getMaster(skin) {
+  const key = `${skin.type}-${skin.seed}`;
+  let m = masterCache.get(key);
+  if (m) return m;
+  m = document.createElement("canvas");
+  m.width = MASTER_W;
+  m.height = MASTER_H;
+  const ctx = m.getContext("2d");
+  if (skin.type === "metal") drawMetalFrame(m, skin.seed, MASTER_W, MASTER_H, ctx);
+  else drawGemFrame(m, skin.seed, MASTER_W, MASTER_H, ctx);
+  masterCache.set(key, m);
+  return m;
 }
 
-export function SkinFrame({ skin, w, h }) {
+// キャッシュ済みテクスチャから枠の帯だけを描く（ピクセル計算なし）
+function paintBand(canvas, skin, w, h) {
+  const dpr = Math.min(window.devicePixelRatio || 2, 3);
+  const W = Math.round(w * dpr);
+  const H = Math.round(h * dpr);
+  const F = Math.max(1, Math.round(FRAME_PX * dpr));
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, W, H);
+
+  const m = getMaster(skin);
+  const mw = m.width, mh = m.height;
+  const fx = (F / W) * mw;
+  const fy = (F / H) * mh;
+
+  ctx.drawImage(m, 0, 0, mw, fy, 0, 0, W, F);                       // 上辺
+  ctx.drawImage(m, 0, mh - fy, mw, fy, 0, H - F, W, F);             // 下辺
+  if (H - 2 * F > 0) {
+    ctx.drawImage(m, 0, fy, fx, mh - 2 * fy, 0, F, F, H - 2 * F);          // 左辺
+    ctx.drawImage(m, mw - fx, fy, fx, mh - 2 * fy, W - F, F, F, H - 2 * F); // 右辺
+  }
+}
+
+const sameSkin = (a, b) =>
+  a.w === b.w && a.h === b.h && a.skin?.seed === b.skin?.seed && a.skin?.type === b.skin?.type;
+
+// カードに重ねるフレーム
+export const SkinFrame = memo(function SkinFrame({ skin, w, h }) {
   const ref = useRef(null);
+  const type = skin?.type;
+  const seed = skin?.seed;
 
   useEffect(() => {
-    const el = ref.current;
-    if (!el || !skin) return;
-
-    const dpr = window.devicePixelRatio || 2;
-    const W = Math.round(w * dpr);
-    const H = Math.round(h * dpr);
-
-    // カードのサイズ(w)に合わせて枠幅 F と 角丸 R を動的に調整
-    const scale = w / 59;
-    const F = Math.round(Math.max(1.5, scale * 2.5) * dpr);
-    const R = Math.round((3 * scale) * dpr);
-
-    el.style.width  = w + "px";
-    el.style.height = h + "px";
-
-    renderFrameOnly(el, skin, W, H, F, R);
-  }, [skin, w, h]);
+    if (ref.current && skin) paintBand(ref.current, skin, w, h);
+  }, [type, seed, w, h]);
 
   if (!skin) return null;
   return (
     <canvas
       ref={ref}
       className="absolute inset-0 pointer-events-none"
-      style={{ zIndex: 10 }}
+      style={{ zIndex: 10, width: `${w}px`, height: `${h}px` }}
     />
   );
-}
+}, sameSkin);
 
-// プレビュー表示用
-export function SkinPreview({ skin, w=59, h=86 }) {
+// ガチャ・所持一覧用プレビュー（枠だけ）
+export const SkinPreview = memo(function SkinPreview({ skin, w = 59, h = 86 }) {
   const ref = useRef(null);
+  const type = skin?.type;
+  const seed = skin?.seed;
 
   useEffect(() => {
-    const el = ref.current;
-    if (!el || !skin) return;
-
-    const dpr = window.devicePixelRatio || 2;
-    const W = Math.round(w * dpr);
-    const H = Math.round(h * dpr);
-
-    const scale = w / 59;
-    const F = Math.round(Math.max(1.5, scale * 2.5) * dpr);
-    const R = Math.round((3 * scale) * dpr);
-
-    el.style.width  = w + "px";
-    el.style.height = h + "px";
-
-    const ctx = el.getContext("2d");
-    el.width  = W;
-    el.height = H;
-
-    // 背景（白）
-    ctx.fillStyle = "white";
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(0, 0, W, H, R);
-    else ctx.rect(0, 0, W, H);
-    ctx.fill();
-
-    // カード外枠（黒）
-    ctx.strokeStyle = "black";
-    ctx.lineWidth = Math.round(dpr * 1.5);
-    ctx.stroke();
-
-    // フレームテクスチャを重ねて描画
-    renderFrameOnly(el, skin, W, H, F, R);
-
-  }, [skin, w, h]);
+    if (ref.current && skin) paintBand(ref.current, skin, w, h);
+  }, [type, seed, w, h]);
 
   return (
     <canvas
       ref={ref}
-      style={{ display: "block", borderRadius: "2px" }}
+      style={{ display: "block", borderRadius: "2px", width: `${w}px`, height: `${h}px` }}
     />
   );
-}
+}, sameSkin);
