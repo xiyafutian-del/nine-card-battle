@@ -11,6 +11,8 @@ import { makeUnitFromCard } from './engine/effects.js';
 import { buildDeck, applyTurnStart } from './engine/battle.js';
 import { getDeckSkins, getOwnedSkins } from './skins/skinManager.js';
 
+const DECK_SIZE = 15;
+
 function loadActiveDeck() {
   try {
     const saved = localStorage.getItem("activeDeck");
@@ -24,17 +26,26 @@ export default function App() {
   const [screen, setScreen] = useState("lobby");
   const [activeDeck, setActiveDeck] = useState(() => loadActiveDeck());
 
-  const deckCounts = activeDeck?.counts || { 1: 15 };
+  const deckCounts = activeDeck?.counts || { 1: DECK_SIZE };
   const playerGenerator = activeDeck?.generator || "water";
   const deckName = activeDeck?.name || "noname";
   const deckTotal = Object.values(deckCounts).reduce((a, b) => a + b, 0);
+
+  // 15枚ちょうどでなければ対戦不可
+  function deckOk() {
+    if (deckTotal !== DECK_SIZE) {
+      alert(`デッキが${deckTotal}枚です。${DECK_SIZE}枚ちょうどにしてください`);
+      return false;
+    }
+    return true;
+  }
 
   function handleActiveDeckChange(deck) {
     setActiveDeck(deck);
     localStorage.setItem("activeDeck", JSON.stringify(deck));
   }
 
-  // ---- スキン付与ヘルパー ----
+  // ---- スキン付与ヘルパー（PVP用） ----
   function withSkins(cards) {
     const owned = getOwnedSkins();
     const ds = getDeckSkins();
@@ -95,6 +106,7 @@ export default function App() {
   }, [pvpStatus]);
 
   async function handleCreateRoom() {
+    if (!deckOk()) return;
     const pDeck = withSkins(buildDeck(cardPool, deckCounts));
     const rDeck = buildDeck(cardPool, deckCounts);
     const pHand = pDeck.splice(0, 4);
@@ -120,6 +132,7 @@ export default function App() {
   }
 
   async function handleJoinRoom(id) {
+    if (!deckOk()) return;
     const myDeck = withSkins(buildDeck(cardPool, deckCounts));
     const myHand = myDeck.splice(0, 4);
     const state = await joinRoom(id, myDeck, myHand);
@@ -207,6 +220,7 @@ export default function App() {
       setPlayerGenerator={gen => handleActiveDeckChange({ ...activeDeck, generator: gen })}
       deckTotal={deckTotal}
       onStart={mode => {
+        if (!deckOk()) return;
         if (mode !== "pvp") startBattle(mode);  // PVPは部屋作成/入室時に盤面が作られる
         setScreen("battle");
       }}
@@ -217,4 +231,4 @@ export default function App() {
       inputRoomId={inputRoomId} setInputRoomId={setInputRoomId}
     />
   );
-        }
+      }
