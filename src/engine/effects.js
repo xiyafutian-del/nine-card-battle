@@ -96,12 +96,12 @@ export function applyAction(effect, targets, ctx, state) {
       break;
     }
 
-    case "heal":
-      targets.forEach(t => {
-        const u = s.board[t.side][t.col][t.idx];
-        if (u) { u.hp = Math.min(u.maxHp, u.hp + (effect.amount === "damage_dealt" ? ctx.damageDealt || 0 : effect.amount)); }
-      });
-      break;
+case "atk_up":
+  targets.forEach(t => {
+    const u = s.board[t.side][t.col][t.idx];
+    if (u) { u.atk += effect.amount; if (u.baseAtk != null) u.baseAtk += effect.amount; }
+  });
+  break;
 
     case "atk_up":
   targets.forEach(t => {
@@ -362,7 +362,7 @@ export function applyConditionals(state, side) {
         if (!unit?.conditional) return;
 
         // ベース値にリセット
-        unit.atk    = unit.baseAtk + (unit.atkTempUp || 0);
+        unit.atk = unit.baseAtk + (unit.atkTempUp || 0);
         unit.vRange = unit.baseVRange ?? unit.vRange ?? 1;
         unit.hRange = unit.baseHRange ?? unit.hRange ?? 1;
         unit.dRange = unit.baseDRange ?? unit.dRange ?? 1;
