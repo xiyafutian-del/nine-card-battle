@@ -1,101 +1,73 @@
 import { useState } from 'react';
 
+const DECK_SIZE = 15;
+
 export function LobbyScreen({
-  playerGenerator, setPlayerGenerator, deckTotal, onStart, onNav,
-  onCreateRoom, onJoinRoom, pvpStatus, pvpRole, roomId, error,
+  deckTotal, onStart, onNav,
+  onCreateRoom, onJoinRoom, onCancelRoom,
+  pvpStatus, roomId, error,
   inputRoomId, setInputRoomId,
 }) {
   const [helpOpen, setHelpOpen] = useState(false);
   const [pvpOpen, setPvpOpen] = useState(false);
 
+  const busy = pvpStatus === "waiting" || pvpStatus === "playing";
+  const deckInvalid = deckTotal !== DECK_SIZE;
+
   return (
-    <div className="min-h-screen bg-white text-black flex flex-col items-center px-4 py-6">
+    <div className="min-h-screen bg-white text-black flex flex-col items-center px-4 py-8">
       <div className="w-full max-w-sm">
-        {/* タイトル */}
-        <div className="text-center text-black text-xs font-bold tracking-widest mb-1">TACTICAL CARD BATTLE</div>
-        <h1 className="text-center text-3xl font-extrabold tracking-widest mb-1">9カード</h1>
-        <div className="h-px bg-black mb-5"/>
+        <div className="text-center text-xs font-bold tracking-widest mb-1">TACTICAL CARD BATTLE</div>
+        <h1 className="text-center text-3xl font-extrabold tracking-widest mb-1">9 CARD</h1>
+        <div className="h-px bg-black mb-4"/>
+
+        {deckInvalid && (
+          <div className="text-xs text-red-600 border border-red-600 px-2 py-1 mb-3 text-center">
+            デッキが{deckTotal}枚です（{DECK_SIZE}枚ちょうど必要）
+          </div>
+        )}
+        {busy && (
+          <div className="text-xs text-gray-600 border border-gray-400 px-2 py-1 mb-3 text-center">
+            PVP待機中のため、他のモードは開始できません
+          </div>
+        )}
 
         <div className="space-y-3">
-          
-          {/* 上段：デッキ（左縦長） vs ずかん・フレーム（右2段） */}
-          <div className="grid grid-cols-2 gap-3">
-            
-            {/* デッキ（カードプレビュー用スペース入り） */}
-            <button 
-              onClick={() => onNav("deck")} 
-              className="bg-white hover:bg-gray-50 border border-black p-3 flex flex-col justify-between items-center text-center transition-colors h-52 group"
-            >
-              <div className="w-full text-left">
-                <div className="font-extrabold text-sm">デッキ</div>
-                <div className="text-[10px] text-gray-500 font-mono">{deckTotal}/15枚</div>
-              </div>
+          <button onClick={() => onStart("pve")} disabled={busy}
+            className="w-full bg-white hover:bg-gray-100 font-bold py-3 border border-black tracking-wide disabled:opacity-40">
+            PVE対戦
+          </button>
+          <button onClick={() => onStart("solo")} disabled={busy}
+            className="w-full bg-white hover:bg-gray-100 font-bold py-3 border border-black tracking-wide disabled:opacity-40">
+            1人回し
+          </button>
 
-              {/* 将来的にデッキのカード画像を描画するプレビューエリア */}
-              <div className="w-24 h-32 border border-dashed border-gray-400 rounded flex flex-col items-center justify-center bg-gray-50 my-1 group-hover:border-black transition-colors">
-                <div className="text-2xl text-gray-300">🎴</div>
-                <div className="text-[10px] text-gray-400 mt-1 font-bold">CARD AREA</div>
-              </div>
-
-              <div className="text-[10px] font-bold text-gray-600 group-hover:translate-x-0.5 transition-transform">
-                編集する →
-              </div>
-            </button>
-
-            {/* 右側：ずかん & フレーム */}
-            <div className="flex flex-col gap-3 h-52">
-              <button 
-                onClick={() => onNav("dex")} 
-                className="flex-1 bg-white hover:bg-gray-50 border border-black p-3 flex flex-col justify-center items-center transition-colors"
-              >
-                <div className="font-extrabold text-base">ずかん</div>
-                <div className="text-[10px] text-gray-400">カード一覧</div>
-              </button>
-
-              <button 
-                onClick={() => onNav("skins")}
-                className="flex-1 bg-white hover:bg-gray-50 border border-black p-3 flex flex-col justify-center items-center transition-colors"
-              >
-                <div className="font-extrabold text-base">フレーム</div>
-                <div className="text-[10px] text-gray-400">スキン・ガチャ</div>
-              </button>
-            </div>
-
-          </div>
-
-          {/* 中段：PVP（全幅横長） */}
-          <div className="border border-black bg-white">
-            <button
-              onClick={() => setPvpOpen(o => !o)}
-              className="w-full font-extrabold py-3.5 px-4 tracking-wider flex items-center justify-between text-base hover:bg-gray-50 transition-colors"
-            >
+          {/* PVP */}
+          <div className="border border-black">
+            <button onClick={() => setPvpOpen(o => !o)}
+              className="w-full font-bold py-3 tracking-wide flex items-center justify-between px-4">
               <span>PVP対戦</span>
-              <span className="text-xs font-mono">{pvpOpen ? "▲" : "▼"}</span>
+              <span>{pvpOpen || busy ? "▲" : "▼"}</span>
             </button>
 
-            {/* PVP対戦用のアコーディオン展開エリア */}
-            {pvpOpen && (
-              <div className="border-t border-black p-3 space-y-3 bg-gray-50">
+            {(pvpOpen || busy) && (
+              <div className="border-t border-black p-3 space-y-3">
                 {pvpStatus === "idle" && (
                   <>
-                    <button
-                      onClick={onCreateRoom}
-                      className="w-full bg-white hover:bg-gray-100 font-bold py-2 border border-black text-xs"
-                    >
+                    <button onClick={onCreateRoom}
+                      className="w-full bg-white hover:bg-gray-100 font-bold py-2 border border-black text-sm">
                       部屋を作る（ホスト）
                     </button>
                     <div className="flex gap-2">
                       <input
-                        className="flex-1 border border-black px-2 py-1.5 text-xs font-mono tracking-widest uppercase bg-white"
+                        className="flex-1 border border-black px-2 py-2 text-sm font-mono tracking-widest uppercase"
                         placeholder="ルームID"
                         value={inputRoomId}
                         onChange={e => setInputRoomId(e.target.value.toUpperCase())}
                         maxLength={6}
                       />
-                      <button
-                        onClick={() => onJoinRoom(inputRoomId)}
-                        className="bg-white hover:bg-gray-100 font-bold px-3 border border-black text-xs"
-                      >
+                      <button onClick={() => onJoinRoom(inputRoomId)}
+                        className="bg-white hover:bg-gray-100 font-bold px-3 border border-black text-sm">
                         入室
                       </button>
                     </div>
@@ -106,18 +78,20 @@ export function LobbyScreen({
                 {pvpStatus === "waiting" && (
                   <div className="text-center py-2">
                     <div className="text-xs text-gray-500 mb-1">ルームID</div>
-                    <div className="text-2xl font-mono font-bold tracking-widest border border-black py-1.5 bg-white">{roomId}</div>
+                    <div className="text-3xl font-mono font-bold tracking-widest border border-black py-2">{roomId}</div>
                     <div className="text-xs text-gray-500 mt-2">相手の入室を待っています…</div>
+                    <button onClick={onCancelRoom}
+                      className="mt-3 w-full bg-white border border-black font-bold py-2 text-sm">
+                      待機をやめる
+                    </button>
                   </div>
                 )}
 
                 {pvpStatus === "playing" && (
                   <div className="text-center py-2">
-                    <div className="text-green-600 font-bold text-xs mb-1">対戦相手が見つかりました！</div>
-                    <button
-                      onClick={() => onStart("pvp")}
-                      className="w-full bg-black text-white font-bold py-2.5 text-xs"
-                    >
+                    <div className="text-green-600 font-bold text-sm mb-2">対戦相手が見つかりました！</div>
+                    <button onClick={() => onStart("pvp")}
+                      className="w-full bg-black text-white font-bold py-3 text-sm">
                       ゲーム開始
                     </button>
                   </div>
@@ -126,59 +100,43 @@ export function LobbyScreen({
             )}
           </div>
 
-          {/* 下段：NPC vs 1人回し（横並び2分割） */}
-          <div className="grid grid-cols-2 gap-3">
-            <button 
-              onClick={() => onStart("pve")} 
-              className="bg-white hover:bg-gray-50 font-extrabold py-3 border border-black text-sm tracking-wide transition-colors"
-            >
-              NPC対戦
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <button onClick={() => onNav("deck")}
+              className="bg-white hover:bg-gray-100 font-semibold py-3 border border-black">
+              デッキ編成
+              <div className={`text-xs ${deckInvalid ? "text-red-600 font-bold" : "text-gray-400"}`}>
+                {deckTotal}/{DECK_SIZE}枚
+              </div>
             </button>
-            <button 
-              onClick={() => onStart("solo")} 
-              className="bg-white hover:bg-gray-50 font-extrabold py-3 border border-black text-sm tracking-wide transition-colors"
-            >
-              1人回し
+            <button onClick={() => onNav("dex")}
+              className="bg-white hover:bg-gray-100 font-semibold py-3 border border-black">
+              カード図鑑
             </button>
           </div>
 
-          {/* 最下段：ルール vs 未定（横並び2分割） */}
-          <div className="grid grid-cols-2 gap-3">
-            <button 
-              onClick={() => setHelpOpen(h => !h)} 
-              className="bg-white hover:bg-gray-50 font-bold py-2.5 border border-black text-xs flex items-center justify-between px-3 transition-colors"
-            >
-              <span>ルール</span>
-              <span className="text-[10px]">{helpOpen ? "▲" : "▼"}</span>
-            </button>
-
-            {/* 今後の機能追加用ボタン */}
-            <button 
-              disabled 
-              className="bg-gray-100 text-gray-400 font-bold py-2.5 border border-gray-300 text-xs cursor-not-allowed"
-            >
-              未定
-            </button>
-          </div>
-
-          {/* ルール・解説表示領域 */}
-          {helpOpen && (
-            <div className="text-xs text-gray-600 leading-relaxed space-y-1.5 p-3 border border-black bg-gray-50 mt-2">
-              <p>盤面は自陣3×3。コア（HP10）が中央前列に配置、破壊されたら負け。</p>
-              <p><b>勝利条件</b>：コア破壊</p>
-              <p><b>デッキ</b>：15枚のカードを選択し自由に組む。同名制限無し。</p>
-              <p><b>発電機</b>：種類によりコスト収入パターンが変わる。</p>
-              <p><b>　ユニット</b>：自動で前詰め。選択で移動可能</p>
-              <p><b>　施設</b>：移動不可・前詰めなし。</p>
-              <p><b>　　長方形射程</b>：n.mとして表される。nが自分のいる列を中心とした列数、mが自分のいる行の何行先までかを表す。</p>
-              <p><b>　　ひし形射程</b>：dkとして表される。自身からkマス移動して届く範囲を攻撃可能。</p>
-              <p><b>　タンク</b>：長方形射程の列またはひし形射程の経路に入ることにより自身以降のカードを選択不可にする。</p>
-              <p><b>　成長</b>：自身をタップし、手札から条件に合うカードを選択で召喚。。</p>
-              <p>手札をスワイプ/ドラッグ(0.5秒ぐらい)で召喚。ユニットタップで橙=攻撃/緑=移動。</p>
-            </div>
-          )}
-
+          <button onClick={() => onNav("skins")}
+            className="w-full bg-white hover:bg-gray-100 font-bold py-3 border border-black tracking-wide">
+            フレームスキン
+            <div className="text-xs text-gray-400 font-normal">ガチャ・スキン設定</div>
+          </button>
         </div>
+
+        {/* ルール早見表 */}
+        <button onClick={() => setHelpOpen(h => !h)}
+          className="w-full mt-4 text-left text-sm text-gray-600 border-t border-gray-300 pt-3 flex justify-between">
+          <span>ルール早見表</span><span>{helpOpen ? "▲" : "▼"}</span>
+        </button>
+        {helpOpen && (
+          <div className="text-xs text-gray-600 leading-relaxed space-y-1.5 mt-2 border border-gray-300 p-3">
+            <p>盤面は自陣3×3。コア（HP10）が中央前列にいて、破壊されたら負け。</p>
+            <p><b>勝利条件</b>：①コア破壊 ②25T経過→コアHP→場のHP合計→引き分け</p>
+            <p><b>ターンの流れ</b>：ドロー → 召喚フェーズ → 行動フェーズ（移動・攻撃）→ ターン終了。前のフェーズには戻れません。</p>
+            <p><b>召喚</b>：手札をドラッグ。ユニットは列の最後尾、施設は好きな位置に出せます。出したユニットは回転した状態で登場します（先制を除く）。成長は召喚フェーズのみ。</p>
+            <p><b>行動</b>：ユニットをタップ。緑=移動先、橙=攻撃先。行動すると90度回転し、次の自分のターン開始で戻ります。</p>
+            <p><b>魔法・スペル</b>：いつでも、手札を盤面へドラッグして使用。</p>
+            <p>先行1T目は移動・攻撃できません。</p>
+          </div>
+        )}
       </div>
     </div>
   );
