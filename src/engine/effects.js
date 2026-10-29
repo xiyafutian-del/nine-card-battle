@@ -1,283 +1,257 @@
 import { ATTRS } from '../constants/index.js';
 
-// ============ ターゲット解決 ============
+const attrList = f => (Array.isArray(f?.attr) ? f.attr : [f?.attr]);
+
+// ===== ターゲット解決 =====
 export function resolveTargets(target, ctx) {
   const { board, side, col, idx, hand } = ctx;
   const enem = side === "blue" ? "red" : "blue";
-
-  // 磁力持ちがいれば random 系はそちらに向く
   const magnets = board[enem].flat().filter(u => u?.effect?.action === "magnet");
 
-  function allEnemyUnits() {
-    const units = [];
-    board[enem].forEach((c, ci) => c.forEach((u, ii) => { if (u) units.push({ side: enem, col: ci, idx: ii, unit: u }); }));
-    return units;
-  }
-  function pickRandom(list) {
+  const allEnemyUnits = () => {
+    const list = [];
+    board[enem].forEach((c, ci) => c.forEach((u, ii) => {
+      if (u) list.push({ side: enem, col: ci, idx: ii });
+    }));
+    return list;
+  };
+  // 磁力持ちがいればランダム対象はそちらへ
+  const pickRandom = list => {
     if (list.length === 0) return null;
     if (magnets.length > 0) {
-      const mList = list.filter(t => magnets.some(m => board[t.side][t.col][t.idx]?.uid === m.uid));
-      if (mList.length > 0) return mList[Math.floor(Math.random() * mList.length)];
+      const m = list.filter(t => board[t.side][t.col][t.idx]?.effect?.action === "magnet");
+      if (m.length > 0) return m[Math.floor(Math.random() * m.length)];
     }
     return list[Math.floor(Math.random() * list.length)];
-  }
+  };
+  const adjacent = [[col - 1, idx], [col + 1, idx], [col, idx - 1], [col, idx + 1]]
+    .filter(([c, i]) => c >= 0 && c < 3 && i >= 0 && i < 3);
 
   switch (target) {
-    case "self":              return [{ side, col, idx }];
-    case "random_enemy":      return [pickRandom(allEnemyUnits())].filter(Boolean);
-    case "all_enemy_front":   return board[enem].map((c, ci) => c[0] ? { side: enem, col: ci, idx: 0 } : null).filter(Boolean);
-    case "enemy_core":        return board[enem].flatMap((c, ci) => c.map((u, ii) => u?.isCore ? { side: enem, col: ci, idx: ii } : null)).filter(Boolean);
+    case "self":
+      return [{ side, col, idx }];
+    case "random_enemy":
+      return [pickRandom(allEnemyUnits())].filter(Boolean);
+    case "all_enemy_front":
+      return board[enem].map((c, ci) => (c[0] ? { side: enem, col: ci, idx: 0 } : null)).filter(Boolean);
+    case "enemy_core":
+      return board[enem].flatMap((c, ci) => c.map((u, ii) => (u?.isCore ? { side: enem, col: ci, idx: ii } : null))).filter(Boolean);
     case "adj_all": {
-      const adj = [];
-      [[col-1,idx],[col+1,idx],[col,idx-1],[col,idx+1]].forEach(([c2,i2]) => {
-        if (c2 >= 0 && c2 < 3 && i2 >= 0 && i2 < 3) {
-          if (board[side][c2]?.[i2])  adj.push({ side, col: c2, idx: i2 });
-          if (board[enem][c2]?.[i2]) adj.push({ side: enem, col: c2, idx: i2 });
-        }
+      const out = [];
+      adjacent.forEach(([c, i]) => {
+        if (board[side]?.[c]?.[i]) out.push({ side, col: c, idx: i });
+        if (board[enem]?.[c]?.[i]) out.push({ side: enem, col: c, idx: i });
       });
-      return adj;
+      return out;
     }
-    case "adj_wall": {
-      const adj = [];
-      [[col-1,idx],[col+1,idx],[col,idx-1],[col,idx+1]].forEach(([c2,i2]) => {
-        if (c2 >= 0 && c2 < 3 && i2 >= 0 && i2 < 3 && board[side][c2]?.[i2]?.attr === ATTRS.WALL)
-          adj.push({ side, col: c2, idx: i2 });
-      });
-      return adj;
-    }
-    case "enemy_front_col":   return board[enem][col]?.[0] ? [{ side: enem, col, idx: 0 }] : [];
-    case "hand":              return hand ? [{ hand: true }] : [];
-    case "grave":             return [{ grave: true }];
-    default:                  return [];
+    case "adj_wall":
+      return adjacent
+        .filter(([c, i]) => board[side]?.[c]?.[i]?.attr === ATTRS.WALL)
+        .map(([c, i]) => ({ side, col: c, idx: i }));
+    case "enemy_front_col":
+      return board[enem][col]?.[0] ? [{ side: enem, col, idx: 0 }] : [];
+    case "hand":
+      return hand ? [{ hand: true }] : [];
+    case "grave":
+      return [{ grave: true }];
+    default:
+      return [];
   }
 }
 
-// ============ アクション実行 ============
+// ===== アクション実行 =====
 export function applyAction(effect, targets, ctx, state) {
   const { side, col, idx, log } = ctx;
   let s = { ...state };
   const enem = side === "blue" ? "red" : "blue";
+  const say = msg => { if (log) log.push(msg); };
 
   const dealDamage = (tside, tcol, tidx, amount) => {
-    const u = s.board[tside][tcol][tidx];
-    if (!u) return false;
+    const u = s.board[tside]?.[tcol]?.[tidx];
+    if (!u) return;
     u.hp -= amount;
-    log.push(`${u.name}に${amount}ダメージ`);
-    if (u.hp <= 0) {
-      if (u.effect?.trigger === "on_death") {
-        const deathCtx = { ...ctx, board: s.board, side: tside, col: tcol, idx: tidx, log };
-        const deathTargets = resolveTargets(u.effect.target, deathCtx);
-        s = applyAction(u.effect, deathTargets, deathCtx, s);
-      }
-      if (u.isCore) s.gameOver = side;
-      s.board[tside][tcol].splice(tidx, 1);
-      return true;
+    say(`${u.name}に${amount}ダメージ`);
+    if (u.hp > 0) return;
+    if (u.effect?.trigger === "on_death") {
+      const dctx = { ...ctx, board: s.board, side: tside, col: tcol, idx: tidx };
+      s = applyAction(u.effect, resolveTargets(u.effect.target, dctx), dctx, s);
     }
-    return false;
+    if (u.isCore) s.gameOver = tside === "blue" ? "red" : "blue";
+    const at = s.board[tside][tcol].indexOf(u);
+    if (at >= 0) s.board[tside][tcol].splice(at, 1);
   };
 
   switch (effect.action) {
     case "damage":
-      targets.forEach(t => { dealDamage(t.side, t.col, t.idx, effect.amount); });
+      targets.forEach(t => dealDamage(t.side, t.col, t.idx, effect.amount));
       break;
 
     case "damage_multi": {
-      const allEn = [];
-      s.board[enem].forEach((c, ci) => c.forEach((u, ii) => { if (u) allEn.push({ side: enem, col: ci, idx: ii }); }));
-      const hits = {};
-      for (let i = 0; i < (effect.times || 1); i++) {
-        const picked = allEn[Math.floor(Math.random() * allEn.length)];
-        if (picked) { const k = `${picked.col},${picked.idx}`; hits[k] = (hits[k] || 0) + 1; }
+      const all = [];
+      s.board[enem].forEach((c, ci) => c.forEach((u, ii) => { if (u) all.push({ col: ci, idx: ii, u }); }));
+      const hits = new Map();
+      for (let i = 0; i < (effect.times || 1) && all.length; i++) {
+        const p = all[Math.floor(Math.random() * all.length)];
+        hits.set(p.u, (hits.get(p.u) || 0) + 1);
       }
-      Object.entries(hits).forEach(([k, cnt]) => {
-        const [ci, ii] = k.split(",").map(Number);
-        dealDamage(enem, ci, ii, effect.amount * cnt);
+      hits.forEach((cnt, u) => {
+        const ci = s.board[enem].findIndex(c => c.includes(u));
+        if (ci >= 0) dealDamage(enem, ci, s.board[enem][ci].indexOf(u), effect.amount * cnt);
       });
       break;
     }
 
-case "atk_up":
-  targets.forEach(t => {
-    const u = s.board[t.side][t.col][t.idx];
-    if (u) { u.atk += effect.amount; if (u.baseAtk != null) u.baseAtk += effect.amount; }
-  });
-  break;
-
-    case "atk_up":
-  targets.forEach(t => {
-    const u = s.board[t.side][t.col][t.idx];
-    if (u) { u.atk += effect.amount; if (u.baseAtk != null) u.baseAtk += effect.amount; }
-  });
-  break;
-
-    case "atk_up_temp":
-      targets.forEach(t => { const u = s.board[t.side][t.col][t.idx]; if (u) { u.atk += effect.amount; u.atkTempUp = (u.atkTempUp || 0) + effect.amount; } });
+    case "heal":
+      targets.forEach(t => {
+        const u = s.board[t.side]?.[t.col]?.[t.idx];
+        if (!u) return;
+        const v = effect.amount === "damage_dealt" ? (ctx.damageDealt || 0) : effect.amount;
+        u.hp = Math.min(u.maxHp, u.hp + v);
+      });
       break;
 
-    case "stun":
+    case "atk_up":
+      // 永続のATK上昇（条件付き効果の再計算で消えないよう基礎値も上げる）
       targets.forEach(t => {
-        const u = s.board[t.side][t.col][t.idx];
-        if (u) {
-          u.acted = true;
-          u.stunned = true;
-          u.rotateDeg = -90;
-          log.push(`${u.name}がスタンした`);
-        }
+        const u = s.board[t.side]?.[t.col]?.[t.idx];
+        if (!u) return;
+        u.atk += effect.amount;
+        if (u.baseAtk != null) u.baseAtk += effect.amount;
+      });
+      break;
+
+    case "atk_up_temp":
+      targets.forEach(t => {
+        const u = s.board[t.side]?.[t.col]?.[t.idx];
+        if (!u) return;
+        u.atk += effect.amount;
+        u.atkTempUp = (u.atkTempUp || 0) + effect.amount;
       });
       break;
 
     case "gain_cost":
-      if (side === "blue") s = { ...s, playerCost: (s.playerCost || 0) + effect.amount };
-      else s = { ...s, aiCost: (s.aiCost || 0) + effect.amount };
-      log.push(`コスト+${effect.amount}獲得`);
+      s = side === "blue"
+        ? { ...s, playerCost: (s.playerCost || 0) + effect.amount }
+        : { ...s, aiCost: (s.aiCost || 0) + effect.amount };
+      say(`コスト+${effect.amount}獲得`);
       break;
 
     case "draw": {
-      const deck = side === "blue" ? [...s.playerDeck] : [...s.aiDeck];
+      const dk = side === "blue" ? "playerDeck" : "aiDeck";
+      const hk = side === "blue" ? "playerHand" : "aiHand";
+      const deck = [...s[dk]];
       const drawn = deck.splice(0, effect.amount);
-      if (side === "blue") { s.playerDeck = deck; s.playerHand = [...s.playerHand, ...drawn]; }
-      else                 { s.aiDeck = deck;     s.aiHand    = [...s.aiHand,    ...drawn]; }
-      log.push(`${drawn.length}枚ドロー`);
+      s = { ...s, [dk]: deck, [hk]: [...s[hk], ...drawn] };
+      say(`${drawn.length}枚ドロー`);
       break;
     }
 
     case "recycle": {
-      const gr = side === "blue" ? [...s.playerGrave] : [...s.aiGrave];
-      const attrs = Array.isArray(effect.filter?.attr) ? effect.filter.attr : [effect.filter?.attr];
-      const recycled = gr.filter(c => attrs.includes(c.attr));
-      const remaining = gr.filter(c => !attrs.includes(c.attr));
-      const deck = side === "blue" ? [...s.playerDeck] : [...s.aiDeck];
-      recycled.forEach(c => deck.splice(Math.floor(Math.random() * deck.length), 0, c));
-      if (side === "blue") { s.playerGrave = remaining; s.playerDeck = deck; }
-      else                 { s.aiGrave = remaining;     s.aiDeck = deck; }
-      log.push(`墓地の${recycled.length}枚をデッキに戻した`);
+      const gk = side === "blue" ? "playerGrave" : "aiGrave";
+      const dk = side === "blue" ? "playerDeck" : "aiDeck";
+      const attrs = attrList(effect.filter);
+      const grave = s[gk] || [];
+      const back = grave.filter(c => attrs.includes(c.attr));
+      const deck = [...s[dk]];
+      back.forEach(c => deck.splice(Math.floor(Math.random() * (deck.length + 1)), 0, c));
+      s = { ...s, [gk]: grave.filter(c => !attrs.includes(c.attr)), [dk]: deck };
+      say(`墓地の${back.length}枚をデッキに戻した`);
       break;
     }
 
-    case "free_summon": {
-      const h = side === "blue" ? [...s.playerHand] : [...s.aiHand];
-      const filter = effect.filter || {};
-      const attrs = filter.attr ? (Array.isArray(filter.attr) ? filter.attr : [filter.attr]) : null;
-      const hi = h.findIndex(c =>
-        (!attrs || attrs.includes(c.attr)) &&
-        (!filter.name || c.name === filter.name) &&
-        (filter.maxCost === undefined || c.cost <= filter.maxCost)
-      );
-      if (hi >= 0) {
-        const card = h[hi];
-        for (let ci = 0; ci < 3; ci++) {
-          if (s.board[side][ci].length < 3) {
-            s.board[side][ci].push(makeUnitFromCard(card));
-            h.splice(hi, 1);
-            log.push(`${card.name}を無償召喚`);
-            break;
-          }
-        }
-        if (side === "blue") s.playerHand = h; else s.aiHand = h;
+    case "swap": {
+      // 召喚した自身と、対象（隣接する壁属性）の位置を入れ替える
+      const t = targets[0];
+      const me = s.board[side]?.[col]?.[idx];
+      const other = t ? s.board[t.side]?.[t.col]?.[t.idx] : null;
+      if (me && other) {
+        s.board[t.side][t.col][t.idx] = me;
+        s.board[side][col][idx] = other;
+        say(`${me.name}が${other.name}と位置を入れ替えた`);
       }
       break;
     }
-      
-      case "unrotate":
-  targets.forEach(t => {
-    const u = s.board[t.side][t.col][t.idx];
-    if (u) { u.rotateDeg = Math.min(0, (u.rotateDeg||0) + 90); u.acted = false; u.stunned = false; u.actCount = 0; log.push(`${u.name}が行動可能に`); }
-  });
-  break;
 
-    case "growth": {
-      const h = side === "blue" ? [...s.playerHand] : [...s.aiHand];
-      const gr = side === "blue" ? [...s.playerGrave] : [...s.aiGrave];
-      const attrs = Array.isArray(effect.filter?.attr) ? effect.filter.attr : [effect.filter?.attr];
-      const candidates = h.filter(c => attrs.includes(c.attr) && c.cost <= (effect.maxCost || 99))
-                          .sort((a, b) => b.cost - a.cost);
-      if (candidates.length > 0) {
-        const card = candidates[0];
-        const hi2 = h.findIndex(c => c._k === card._k);
-        const self = s.board[side][col].splice(idx, 1)[0];
-        if (self) gr.push(self);
-        s.board[side][col].splice(Math.min(idx, s.board[side][col].length), 0, makeUnitFromCard(card));
-        h.splice(hi2, 1);
-        log.push(`${self?.name}が成長→${card.name}召喚`);
-        if (side === "blue") { s.playerHand = h; s.playerGrave = gr; } else { s.aiHand = h; s.aiGrave = gr; }
-      } else {
-        log.push("成長: 手札に条件カードなし");
-      }
+    case "stun":
+      targets.forEach(t => {
+        const u = s.board[t.side]?.[t.col]?.[t.idx];
+        if (!u) return;
+        u.acted = true; u.stunned = true; u.rotateDeg = -90;
+        say(`${u.name}がスタンした`);
+      });
       break;
-    }
+
+    case "unrotate":
+      targets.forEach(t => {
+        const u = s.board[t.side]?.[t.col]?.[t.idx];
+        if (!u) return;
+        u.rotateDeg = Math.min(0, (u.rotateDeg || 0) + 90);
+        u.acted = false; u.stunned = false; u.actCount = 0;
+        say(`${u.name}が行動可能に`);
+      });
+      break;
 
     default:
       break;
   }
-
   return s;
 }
 
-// ============ パッシブ効果の計算 ============
-export function calcPassiveCostReduction(card, side, board, grave) {
+// ===== コスト軽減（重複は無制限） =====
+export function calcPassiveCostReduction(card, side, board, grave = []) {
   let reduction = 0;
-
+  // 場にいる軽減持ち1体につき amount ずつ軽減（上限なし）
   board[side].flat().forEach(u => {
-    if (!u?.effect) return;
-    const e = u.effect;
-    if (e.action === "cost_minus_attr") {
-      const attrs = Array.isArray(e.filter?.attr) ? e.filter.attr : [e.filter?.attr];
-      if (attrs.includes(card.attr)) {
-        const stack = board[side].flat().filter(x => x?.effect?.action === "cost_minus_attr" && JSON.stringify(x.effect.filter) === JSON.stringify(e.filter)).length;
-        reduction += Math.min(e.maxStack || 99, stack) * (e.amount || 1);
-        return;
-      }
-    }
-    if (e.action === "cost_minus_by_grave" && card.attr === u.attr) {
-      const attrs2 = Array.isArray(e.filter?.attr) ? e.filter.attr : [e.filter?.attr];
-      reduction += grave.filter(c => attrs2.includes(c.attr)).length;
-    }
+    const e = u?.effect;
+    if (e?.action !== "cost_minus_attr") return;
+    if (attrList(e.filter).includes(card.attr)) reduction += e.amount || 1;
   });
+  // 手札のカード自身の効果: 墓地の指定属性の枚数ぶん軽減
+  if (card.effect?.action === "cost_minus_by_grave") {
+    const attrs = attrList(card.effect.filter);
+    reduction += grave.filter(c => attrs.includes(c.attr)).length;
+  }
   return reduction;
 }
 
-export function calcForgeBonus(side, col, idx, board) {
-  const adj = [board[side][col-1]?.[idx], board[side][col+1]?.[idx], board[side][col]?.[idx-1], board[side][col]?.[idx+1]];
-  return adj.filter(u => u?.effect?.action === "forge_adj").length > 0 ? 1 : 0;
+// 実際に払うコスト（手札の表示・出せるかの判定にも使う）
+export function getEffectiveCost(card, side, board, grave) {
+  return Math.max(0, card.cost - calcPassiveCostReduction(card, side, board, grave || []));
 }
 
-// ============ ユニット生成 ============
-let uid = 1;
-const nextKey = () => "k" + uid++;
+export function calcForgeBonus(side, col, idx, board) {
+  const adj = [board[side][col - 1]?.[idx], board[side][col + 1]?.[idx],
+               board[side][col]?.[idx - 1], board[side][col]?.[idx + 1]];
+  return adj.some(u => u?.effect?.action === "forge_adj") ? 1 : 0;
+}
+
+// ===== ユニット生成 =====
+let counter = 1;
 export function makeUnitFromCard(card) {
   return {
-    uid: "u" + uid++,
+    uid: "u" + Math.random().toString(36).slice(2, 8) + (counter++), // 端末間で衝突しないID
     cardId: card.id,
     name: card.name,
-    hp: card.hp,
-    maxHp: card.hp,
-    atk: card.atk,
+    hp: card.hp, maxHp: card.hp,
+    atk: card.atk, baseAtk: card.atk, atkTempUp: 0,
     hRange: card.hRange || 1,
-    vRange: card.vRange || 1,
+    vRange: card.vRange || 1, baseVRange: card.vRange || 1,
     rangeType: card.rangeType || "rect",
     dRange: card.dRange || 1,
-    type: card.type,
-    attr: card.attr,
+    type: card.type, attr: card.attr,
     effect: card.effect || null,
+    conditional: card.conditional || null,
+    tags: [...(card.tags || [])], baseTags: [...(card.tags || [])],
+    desc: card.desc || "",
+    cost: card.cost, originalCost: card.cost,
+    image: card.image || null,
+    skin: card.skin || null,
     isCore: card.id === "core",
     isFacility: card.type === "facility",
-    acted: false,
-    cost: card.cost,
-    tags: card.tags || [],
-    desc: card.desc || "",
-    originalCost: card.cost,
+    acted: false, moved: false, stunned: false, overclocked: false,
+    rotateDeg: 0, actCount: 0,
     summonedTurn: null,
-    image: card.image || null,
-    rotateDeg: 0,
-    actCount: 0,
-    stunned: false,
-    baseAtk: card.atk,
-    baseVRange: card.vRange || 1,
-    baseTags: card.tags || [],
-    conditional: card.conditional || null,
-    skin: card.skin || null,
-    _k: card._k || nextKey(),
-    moved: false, overclocked: false,
+    _k: card._k || ("k" + Math.random().toString(36).slice(2, 8) + (counter++)),
   };
 }
 
@@ -290,98 +264,66 @@ export function shuffle(arr) {
   return a;
 }
 
-// ============ 条件付き効果システム ============
-
+// ===== 条件付き効果・場の状況で変わるATK =====
 function checkCondition(cond, ctx) {
   const { unit, ci, ri, board, side, cost, hand } = ctx;
-  if (!cond) return false;
-
   switch (cond.type) {
-    case "cost_gte":   return cost >= cond.value;
-    case "cost_lte":   return cost <= cond.value;
-    case "hand_gte":   return (hand?.length || 0) >= cond.value;
-    case "hand_lte":   return (hand?.length || 0) <= cond.value;
-    case "hp_lte":     return unit.hp <= cond.value;
-    case "hp_gte":     return unit.hp >= cond.value;
-    case "row_eq":     return ri + 1 === cond.value;
-    case "field_attr": {
-      const total = board[side].flat().filter(u => u && u.attr === cond.value).length;
-      return total >= (cond.count || 1);
-    }
-    case "col_attr": {
-      const colUnits = board[side][ci].filter(u => u && u.attr === cond.value);
-      return colUnits.length >= (cond.count || 1);
-    }
-    case "row_attr": {
-      const rowUnits = board[side].map(c => c[ri]).filter(u => u && u.attr === cond.value);
-      return rowUnits.length >= (cond.count || 1);
-    }
+    case "cost_gte": return cost >= cond.value;
+    case "cost_lte": return cost <= cond.value;
+    case "hand_gte": return hand.length >= cond.value;
+    case "hand_lte": return hand.length <= cond.value;
+    case "hp_lte":   return unit.hp <= cond.value;
+    case "hp_gte":   return unit.hp >= cond.value;
+    case "row_eq":   return ri + 1 === cond.value;
+    case "field_attr":
+      return board[side].flat().filter(u => u && u.attr === cond.value).length >= (cond.count || 1);
+    case "col_attr":
+      return board[side][ci].filter(u => u && u.attr === cond.value).length >= (cond.count || 1);
+    case "row_attr":
+      return board[side].map(c => c[ri]).filter(u => u && u.attr === cond.value).length >= (cond.count || 1);
     default: return false;
   }
 }
 
 function applyCondEffect(effect, unit) {
-  if (!effect) return;
-
-  // 単体オブジェクトでも配列でも処理できるように正規化
-  const effectList = Array.isArray(effect) ? effect : [effect];
-
-  effectList.forEach(eff => {
-    switch (eff.type) {
-      case "atk_up":    unit.atk    += eff.value; break;
-      case "vrange_up": unit.vRange += eff.value; break;
-      case "hrange_up": unit.hRange += eff.value; break;
-      case "drange_up": unit.dRange += eff.value; break;
-      case "hp_up":     unit.hp     = Math.min(unit.maxHp, unit.hp + eff.value); break;
-      case "tag_add":
-        if (!unit.tags.includes(eff.value)) unit.tags.push(eff.value);
-        break;
-    }
-  });
+  switch (effect.type) {
+    case "atk_up":    unit.atk += effect.value; break;
+    case "vrange_up": unit.vRange += effect.value; break;
+    case "hp_up":     unit.hp = Math.min(unit.maxHp, unit.hp + effect.value); break;
+    case "tag_add":   if (!unit.tags.includes(effect.value)) unit.tags.push(effect.value); break;
+    default: break;
+  }
 }
 
-// 全ユニットの条件付き効果を再評価
+// 行動のたびに再計算（基礎値 + 一時強化 + 場の状況 + 条件付き効果）
 export function applyConditionals(state, side) {
-  // state と board のディープコピーを作成して参照を切る
-  const newState = {
-    ...state,
-    board: {
-      blue: state.board.blue.map(col => col.map(u => u ? { ...u, tags: [...(u.tags || [])] } : null)),
-      red:  state.board.red.map(col => col.map(u => u ? { ...u, tags: [...(u.tags || [])] } : null)),
-    }
-  };
-
-  const board = newState.board;
-
   ["blue", "red"].forEach(s => {
-    const sCost = s === "blue" ? newState.playerCost || 0 : newState.aiCost || 0;
-    const sHand = s === "blue" ? newState.playerHand || [] : newState.aiHand || [];
+    const cost = s === "blue" ? state.playerCost : state.aiCost;
+    const hand = (s === "blue" ? state.playerHand : state.aiHand) || [];
 
-    board[s].forEach((col, ci) => {
-      col.forEach((unit, ri) => {
-        if (!unit?.conditional) return;
+    state.board[s].forEach((col, ci) => col.forEach((unit, ri) => {
+      if (!unit) return;
+      const fieldAtk = unit.effect?.action === "atk_plus_by_field";
+      if (!unit.conditional && !fieldAtk) return;
 
-        // ベース値にリセット
-        unit.atk = unit.baseAtk + (unit.atkTempUp || 0);
-        unit.vRange = unit.baseVRange ?? unit.vRange ?? 1;
-        unit.hRange = unit.baseHRange ?? unit.hRange ?? 1;
-        unit.dRange = unit.baseDRange ?? unit.dRange ?? 1;
-        unit.tags   = [...(unit.baseTags || [])];
+      unit.atk    = (unit.baseAtk ?? unit.atk) + (unit.atkTempUp || 0);
+      unit.vRange = unit.baseVRange ?? unit.vRange;
+      unit.tags   = [...(unit.baseTags || unit.tags || [])];
 
-        // 配列形式と単体形式の両方に対応
-        const condList = Array.isArray(unit.conditional) ? unit.conditional : [unit.conditional];
+      // 龍王: 場の他の指定属性1体につきATK+amount
+      if (fieldAtk) {
+        const attrs = attrList(unit.effect.filter);
+        const n = state.board[s].flat().filter(u => u && u !== unit && attrs.includes(u.attr)).length;
+        unit.atk += n * (unit.effect.amount || 1);
+      }
 
-        condList.forEach(condObj => {
-          const { condition, effect } = condObj;
-          const met = checkCondition(condition, {
-            unit, ci, ri, board, side: s,
-            cost: sCost, hand: sHand
-          });
-          if (met) applyCondEffect(effect, unit);
-        });
+      const list = Array.isArray(unit.conditional) ? unit.conditional
+        : unit.conditional ? [unit.conditional] : [];
+      list.forEach(({ condition, effect }) => {
+        if (checkCondition(condition, { unit, ci, ri, board: state.board, side: s, cost, hand }))
+          applyCondEffect(effect, unit);
       });
-    });
+    }));
   });
-
-  return newState;
-}
+  return state;
+          }
