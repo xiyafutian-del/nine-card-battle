@@ -162,6 +162,11 @@ export default function App() {
     leaveToLobby();
     setScreen("lobby");
   }
+    // PVP待機をやめる（部屋を閉じて、作りかけの盤面も破棄）
+  function handleCancelRoom() {
+    leaveRoom();
+    leaveToLobby();
+  }
 
   // ---- カード管理 ----
   function addCard(data) {
@@ -262,6 +267,7 @@ export default function App() {
       onJoinRoom={handleJoinRoom}
       pvpStatus={pvpStatus} pvpRole={pvpRole} roomId={roomId} error={error}
       inputRoomId={inputRoomId} setInputRoomId={setInputRoomId}
+      onCancelRoom={handleCancelRoom}
     />
   );
       }
