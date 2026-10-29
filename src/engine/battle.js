@@ -1,6 +1,6 @@
 import { TYPES, MAX_TURNS, getGeneratorCost } from '../constants/index.js';
 import { makeUnitFromCard, shuffle, resolveTargets, applyAction,
-         calcForgeBonus, calcPassiveCostReduction, getEffectiveCost,
+         calcForgeBonus, calcPassiveCostReduction, getEffectiveCost,unitToCard,
          applyConditionals } from './effects.js';
 export function cloneBoard(board) {
   return {
@@ -252,14 +252,14 @@ export function attackUnit(state, side, atkCol, atkIdx, defCol, defIdx) {
     }
     if (defender.isCore) ns.gameOver = side;
     const di = board[enem][defCol].indexOf(defender);
-    if (di >= 0) board[enem][defCol].splice(di, 1);
+    if (di >= 0) {
+      board[enem][defCol].splice(di, 1);
+      if (!defender.isCore) {
+        const gk = enem === "blue" ? "playerGrave" : "aiGrave";
+        ns = { ...ns, [gk]: [...(ns[gk] || []), unitToCard(defender)] };
+      }
+    }
   }
-
-  const vc = checkVictory(board, state.turn);
-  if (vc.over && !ns.gameOver) ns.gameOver = vc.winner;
-  applyConditionals(ns, side);
-  return ns;
-}
 
 // ===== スペル/魔法 =====
 export function activateCard(state, side, handIndex, targetInfo) {
