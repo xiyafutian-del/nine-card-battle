@@ -81,7 +81,7 @@ export default function App() {
   const {
     battle, confirmLeave,
     startBattle, requestBack, leaveToLobby, endTurn, nextPhase,
-    handleCellClick, handleSummon, handleGrowthSelect,
+    handleCellClick, handleSummon, handleGrowthSelect,handleAbility,
     setConfirmLeave, setBattle,
   } = useBattle(
     cardPool, deckCounts, playerGenerator, handleAction,
@@ -198,6 +198,7 @@ export default function App() {
           onLeaveToLobby={handleLeaveToLobby}
           onEndTurn={isPvp ? () => { if (myTurn) endTurn(); } : endTurn}
           onNextPhase={isPvp ? () => { if (myTurn) nextPhase(); } : nextPhase}
+                    onAbility={isPvp ? () => { if (myTurn) handleAbility(); } : handleAbility}
           onCellClick={isPvp
             ? (row, col, extra) => { if (myTurn || row === -1) handleCellClick(row, col, extra); }
             : handleCellClick}
