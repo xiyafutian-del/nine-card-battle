@@ -1,7 +1,7 @@
 import { TYPES, MAX_TURNS, getGeneratorCost } from '../constants/index.js';
 import { makeUnitFromCard, shuffle, resolveTargets, applyAction,
-         calcForgeBonus, calcPassiveCostReduction, applyConditionals } from './effects.js';
-
+         calcForgeBonus, calcPassiveCostReduction, getEffectiveCost,
+         applyConditionals } from './effects.js';
 export function cloneBoard(board) {
   return {
     blue: board.blue.map(col => col.map(u => ({ ...u }))),
@@ -267,12 +267,13 @@ export function activateCard(state, side, handIndex, targetInfo) {
   const card = hand[handIndex];
   if (!card) return state;
 
+  const grave = side === "blue" ? [...(state.playerGrave || [])] : [...(state.aiGrave || [])];
   const cost = side === "blue" ? state.playerCost : state.aiCost;
-  if (cost < card.cost) return state;
+  const effCost = getEffectiveCost(card, side, state.board, grave);
+  if (cost < effCost) return state;
 
   const board = cloneBoard(state.board);
   const log = [...state.log, `${card.name}を使用`];
-  const grave = side === "blue" ? [...(state.playerGrave || [])] : [...(state.aiGrave || [])];
   const ctx = { board, side, col: targetInfo?.col, idx: targetInfo?.idx, hand, grave, log, selectedTarget: targetInfo };
 
   const e = card.effect;
@@ -283,11 +284,9 @@ export function activateCard(state, side, handIndex, targetInfo) {
       : resolveTargets(e.target || "self", ctx);
   }
 
-  // コストを先に支払った状態で効果を適用
-  const paid = side === "blue" ? { playerCost: cost - card.cost } : { aiCost: cost - card.cost };
+  const paid = side === "blue" ? { playerCost: cost - effCost } : { aiCost: cost - effCost };
   let ns = applyAction(e || {}, targets, ctx, { ...state, board, log, ...paid });
 
-  // スペルは使用後に手札から墓地へ（効果で変化した手札・墓地を保持）
   if (card.type === "spell") {
     const hk = side === "blue" ? "playerHand" : "aiHand";
     const gk = side === "blue" ? "playerGrave" : "aiGrave";
@@ -301,4 +300,4 @@ export function activateCard(state, side, handIndex, targetInfo) {
   if (vc.over && !ns.gameOver) ns.gameOver = vc.winner;
   applyConditionals(ns, side);
   return ns;
-               }
+}
