@@ -5,31 +5,34 @@ function generateRoomId() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
+// 通信に乗せない: アップロード画像(data:...)は除去して複製する
+function stripImages(obj) {
+  return JSON.parse(JSON.stringify(obj, (k, v) =>
+    (k === "image" && typeof v === "string" && v.startsWith("data:")) ? null : v));
+}
+
 export function usePVP(onStateUpdate) {
   const [roomId, setRoomId] = useState("");
   const [inputRoomId, setInputRoomId] = useState("");
   const [pvpRole, setPvpRole] = useState(null);
   const [pvpStatus, setPvpStatus] = useState("idle");
   const [error, setError] = useState("");
-  const [absentSec, setAbsentSec] = useState(0); // 相手の不在秒数（0=接続中）
+  const [absentSec, setAbsentSec] = useState(0);
 
   const channelRef = useRef(null);
   const roleRef = useRef(null);
   const roomIdRef = useRef("");
   const statusRef = useRef("idle");
-  const revRef = useRef(0);                 // 受信・送信した最新の通し番号
+  const revRef = useRef(0);
   const absentSinceRef = useRef(null);
   const sendRef = useRef({ busy: false, pending: null });
   const onUpdateRef = useRef(onStateUpdate);
-  onUpdateRef.current = onStateUpdate;      // 常に最新のコールバックを使う
+  onUpdateRef.current = onStateUpdate;
 
-  function otherRole() {
-    return roleRef.current === "host" ? "guest" : "host";
-  }
+  const otherRole = () => (roleRef.current === "host" ? "guest" : "host");
 
   function setStatus(s) {
     if (s === "playing" && statusRef.current !== "playing") {
-      // 対戦開始時点の相手の接続状況で不在タイマーを初期化
       const online = (channelRef.current?.presenceState?.()[otherRole()] || []).length > 0;
       absentSinceRef.current = online ? null : Date.now();
     }
@@ -37,7 +40,6 @@ export function usePVP(onStateUpdate) {
     setPvpStatus(s);
   }
 
-  // 相手からの状態を反映（古い通し番号は無視）
   function applyIncoming(row) {
     if (!row?.state) return;
     if (row.updated_by === roleRef.current) return;
@@ -76,7 +78,7 @@ export function usePVP(onStateUpdate) {
     const id = generateRoomId();
     const { error: err } = await supabase.from("rooms").insert({
       id,
-      state: { ...initialState, rev: 0 },
+      state: stripImages({ ...initialState, rev: 0 }),
       host_id: "host",
       status: "waiting",
       updated_by: "host",
@@ -92,7 +94,6 @@ export function usePVP(onStateUpdate) {
     return id;
   }
 
-  // guestGenerator: ゲストの発電機をホスト側にも伝える
   async function joinRoom(id, guestDeck, guestHand, guestGenerator) {
     setError("");
     const rid = id.toUpperCase();
@@ -100,7 +101,7 @@ export function usePVP(onStateUpdate) {
     if (err || !data) { setError("部屋が見つかりません"); return null; }
     if (data.status !== "waiting") { setError("この部屋はすでに満員です"); return null; }
 
-    const newState = {
+    const newState = stripImages({
       ...data.state,
       aiDeck: guestDeck,
       aiHand: guestHand,
@@ -108,7 +109,7 @@ export function usePVP(onStateUpdate) {
       aiGrave: [],
       aiGenerator: guestGenerator || "water",
       rev: (data.state?.rev || 0) + 1,
-    };
+    });
 
     const { error: err2 } = await supabase.from("rooms").update({
       guest_id: "guest", status: "ready", updated_by: "guest", state: newState,
@@ -125,7 +126,6 @@ export function usePVP(onStateUpdate) {
     return newState;
   }
 
-  // 送信は常に「最新の状態だけ」を順番に送る（順序入れ替わり防止）
   async function flush() {
     const q = sendRef.current;
     if (q.busy) return;
@@ -150,11 +150,14 @@ export function usePVP(onStateUpdate) {
     const id = roomIdRef.current;
     if (!id || !state) return;
     revRef.current += 1;
-    sendRef.current.pending = { roomId: id, state: { ...state, rev: revRef.current } };
+    sendRef.current.pending = { roomId: id, state: stripImages({ ...state, rev: revRef.current }) };
     flush();
   }
 
   function leaveRoom() {
+    const id = roomIdRef.current;
+    const wasWaitingHost = roleRef.current === "host" && statusRef.current === "waiting";
+
     if (channelRef.current) supabase.removeChannel(channelRef.current);
     channelRef.current = null;
     roomIdRef.current = "";
@@ -164,9 +167,13 @@ export function usePVP(onStateUpdate) {
     sendRef.current = { busy: false, pending: null };
     setRoomId(""); setPvpRole(null); setAbsentSec(0); setError("");
     setStatus("idle");
+
+    // 待機中に閉じた部屋は削除（後から入室されないように）
+    if (id && wasWaitingHost) {
+      supabase.from("rooms").delete().eq("id", id).then(() => {}, () => {});
+    }
   }
 
-  // 不在秒数を1秒ごとに更新
   useEffect(() => {
     const t = setInterval(() => {
       const since = absentSinceRef.current;
@@ -175,7 +182,6 @@ export function usePVP(onStateUpdate) {
     return () => clearInterval(t);
   }, []);
 
-  // タブ復帰時: 再接続を知らせて最新状態を取得
   useEffect(() => {
     async function onVisible() {
       if (document.visibilityState !== "visible" || !roomIdRef.current) return;
@@ -188,7 +194,6 @@ export function usePVP(onStateUpdate) {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
-  // アンマウント時にチャンネル解除
   useEffect(() => {
     return () => { if (channelRef.current) supabase.removeChannel(channelRef.current); };
   }, []);
