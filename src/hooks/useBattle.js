@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { CORE_CARD } from '../constants/cards.js';
-import { makeUnitFromCard, applyConditionals } from '../engine/effects.js';
+import { makeUnitFromCard, applyConditionals, unitToCard } from '../engine/effects.js';
 import { cloneBoard, buildDeck, checkVictory, applyTurnStart,
          summonUnit, attackUnit, activateCard,
          getAttackTargets, getMovable, rowToCoord } from '../engine/battle.js';
@@ -142,7 +142,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
           if (!u) continue;
           if (u.atkTempUp) { u.atk -= u.atkTempUp; u.atkTempUp = 0; }
           if (u.overclocked) {
-            grave.push(col.splice(i, 1)[0]);
+                        grave.push(unitToCard(col.splice(i, 1)[0]));
             log.push(`${u.name}はオーバークロックで破壊された`);
           }
         }
@@ -317,7 +317,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
 
       const gi = board[active][col].findIndex(u => u.uid === gu.uid);
       if (gi === -1) return prev;
-      grave.push(board[active][col].splice(gi, 1)[0]);
+      grave.push(unitToCard(board[active][col].splice(gi, 1)[0]));
 
       const nu = makeUnitFromCard(card);
       nu.summonedTurn = prev.turn;
