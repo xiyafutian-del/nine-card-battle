@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { CORE_CARD } from '../constants/cards.js';
 import { makeUnitFromCard, applyConditionals } from '../engine/effects.js';
@@ -20,6 +21,9 @@ function isValidSpellTarget(card, active, side, unit) {
   }
 }
 
+// 場の能力（サンドゴーレム: 壁と位置を入れ替え）を持つか
+const hasAbility = u => u?.effect?.trigger === "activate" && u?.effect?.action === "swap_self";
+
 const findSkin = (deckSkins, ownedSkins, key) => {
   const id = deckSkins?.[key];
   return id ? (ownedSkins || []).find(s => s.instanceId === id) || null : null;
@@ -27,13 +31,13 @@ const findSkin = (deckSkins, ownedSkins, key) => {
 
 // フェーズは「召喚 → 行動（移動・攻撃）」の2段階。戻れない
 const PHASE_ORDER = ["summon", "action"];
+const CLEAR_SEL = { selectedUnit: null, selectedSpell: null, selectedGrowth: null, selectedAbility: null };
 
 function initBattle(mode, cardPool, deckCounts, playerGenerator, deckSkins, ownedSkins, deckName) {
   const name = deckName || "noname";
   const pDeck = buildDeck(cardPool, deckCounts);
   const rDeck = buildDeck(cardPool, deckCounts);
 
-  // デッキ内の同名カードに順番でスキンを付与
   const idx = {};
   pDeck.forEach(card => {
     const i = idx[card.id] || 0;
@@ -59,7 +63,7 @@ function initBattle(mode, cardPool, deckCounts, playerGenerator, deckSkins, owne
     turn: 1, active: "blue", firstPlayer: "blue",
     playerGenerator, aiGenerator: "water",
     mode, phase: "summon",
-    selectedUnit: null, selectedSpell: null, selectedGrowth: null,
+    ...CLEAR_SEL,
     log: ["バトル開始！"], gameOver: null,
   };
   return applyTurnStart(state, "blue", playerGenerator);
@@ -83,8 +87,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
             board.red.forEach(col => col.forEach(u => {
               if (u?.atkTempUp) { u.atk -= u.atkTempUp; u.atkTempUp = 0; }
             }));
-            ns = { ...ns, board, active: "blue", turn: prev.turn + 1,
-                   selectedUnit: null, selectedSpell: null, selectedGrowth: null };
+            ns = { ...ns, board, active: "blue", turn: prev.turn + 1, ...CLEAR_SEL };
             ns = applyTurnStart(ns, "blue", prev.playerGenerator);
             ns.log = [...ns.log, `あなたのターン (Turn ${ns.turn})`];
           }
@@ -116,7 +119,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
       if (!prev || prev.gameOver) return prev;
       const i = PHASE_ORDER.indexOf(prev.phase || "summon");
       if (i < 0 || i >= PHASE_ORDER.length - 1) return prev;
-      return { ...prev, phase: PHASE_ORDER[i + 1], selectedUnit: null, selectedSpell: null, selectedGrowth: null };
+      return { ...prev, phase: PHASE_ORDER[i + 1], ...CLEAR_SEL };
     });
     push();
   }
@@ -148,13 +151,23 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
       const vc = checkVictory(board, prev.turn);
       if (vc.over) return { ...prev, board, [gk]: grave, gameOver: vc.winner, log: [...log, vc.reason] };
 
-      let ns = { ...prev, board, [gk]: grave, log, active: next, turn: prev.turn + 1,
-                 selectedUnit: null, selectedSpell: null, selectedGrowth: null };
+      let ns = { ...prev, board, [gk]: grave, log, active: next, turn: prev.turn + 1, ...CLEAR_SEL };
       ns = applyTurnStart(ns, next, next === "blue" ? prev.playerGenerator : prev.aiGenerator);
       ns.log = [...ns.log, `${next === "blue" ? "あなた" : "相手"}のターン (Turn ${ns.turn})`];
       return ns;
     });
     push();
+  }
+
+  // ===== 場の能力の発動準備（選択中のユニットから） =====
+  function handleAbility() {
+    setBattle(prev => {
+      if (!prev || prev.gameOver || !prev.selectedUnit) return prev;
+      const { col, idx } = prev.selectedUnit;
+      const u = prev.board[prev.active]?.[col]?.[idx];
+      if (!hasAbility(u)) return prev;
+      return { ...prev, ...CLEAR_SEL, selectedAbility: { col, idx } };
+    });
   }
 
   // ===== セルタップ =====
@@ -166,18 +179,36 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
       // 盤面外タップ: 全選択キャンセル（extra.spell は対象選択状態へ）
       if (row === -1) {
         if (extra?.spell) {
-          return { ...prev, selectedSpell: { handIndex: extra.handIndex, card: extra.card },
-                   selectedUnit: null, selectedGrowth: null };
+          return { ...prev, ...CLEAR_SEL, selectedSpell: { handIndex: extra.handIndex, card: extra.card } };
         }
-        return { ...prev, selectedUnit: null, selectedSpell: null, selectedGrowth: null };
+        return { ...prev, ...CLEAR_SEL };
       }
 
       const phase = prev.phase || "summon";
       const { side, idx } = rowToCoord(row);
-      const { active, selectedUnit, selectedSpell, selectedGrowth } = prev;
+      const { active, selectedUnit, selectedSpell, selectedGrowth, selectedAbility } = prev;
       const enem = active === "blue" ? "red" : "blue";
       const turn1block = prev.turn === 1 && active === prev.firstPlayer;
       const tapped = prev.board[side]?.[col]?.[idx];
+
+      // 場の能力: 入れ替える壁を選択中
+      if (selectedAbility) {
+        const same = selectedAbility.col === col && selectedAbility.idx === idx;
+        if (side === active && tapped?.attr === "wall" && !same) {
+          const board = cloneBoard(prev.board);
+          const a = board[active][selectedAbility.col][selectedAbility.idx];
+          const b = board[active][col][idx];
+          if (a && b) {
+            board[active][selectedAbility.col][selectedAbility.idx] = b;
+            board[active][col][idx] = a;
+            const ns = { ...prev, board, ...CLEAR_SEL, log: [...prev.log, `${a.name}が${b.name}と位置を入れ替えた`] };
+            applyConditionals(ns, active);
+            push();
+            return ns;
+          }
+        }
+        return { ...prev, ...CLEAR_SEL };
+      }
 
       // オーバークロック発動（行動済みの自軍ユニットをタップ）
       if (!selectedSpell && side === active && tapped?.tags?.includes("オーバークロック")
@@ -187,8 +218,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
         u.acted = false; u.stunned = false; u.actCount = 0; u.moved = false;
         u.rotateDeg = 0; u.overclocked = true;
         push();
-        return { ...prev, board, selectedUnit: null, selectedGrowth: null,
-                 log: [...prev.log, `${u.name}がオーバークロック`] };
+        return { ...prev, board, ...CLEAR_SEL, log: [...prev.log, `${u.name}がオーバークロック`] };
       }
 
       // スペル対象指定中
@@ -200,15 +230,21 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
         return { ...ns, selectedSpell: null };
       }
 
+      // 選択できるか: 行動フェーズで未行動 / 場の能力持ちはいつでも
+      const canSelect = u => !!u && (
+        (!u.acted && !u.stunned && phase !== "summon" && !turn1block) || hasAbility(u)
+      );
+
       // ユニット選択中
       if (selectedUnit) {
         const su = selectedUnit;
         const attacker = prev.board[active][su.col]?.[su.idx];
         if (!attacker) return { ...prev, selectedUnit: null };
+        const canAct = phase === "action" && !turn1block && !attacker.acted && !attacker.stunned;
 
         // 攻撃（行動フェーズ）
         if (side === enem) {
-          if (phase === "action") {
+          if (canAct) {
             const valid = getAttackTargets(active, su.col, su.idx, attacker, prev.board);
             if (valid.some(t => t.col === col && t.idx === idx)) {
               const ns = attackUnit(prev, active, su.col, su.idx, col, idx);
@@ -221,7 +257,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
 
         if (side === active) {
           // 移動（行動フェーズ・1回のみ）
-          if (phase === "action" && !attacker.moved) {
+          if (canAct && !attacker.moved) {
             const movable = getMovable(active, su.col, su.idx, prev.board);
             if (movable.some(m => m.col === col && m.idx === idx)) {
               const board = cloneBoard(prev.board);
@@ -241,8 +277,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
           }
           // 別ユニットに選択切替
           const same = su.col === col && su.idx === idx;
-          if (!same && tapped && !tapped.acted && !tapped.stunned && !turn1block && phase !== "summon")
-            return { ...prev, selectedUnit: { col, idx } };
+          if (!same && canSelect(tapped)) return { ...prev, selectedUnit: { col, idx } };
         }
         return { ...prev, selectedUnit: null };
       }
@@ -250,12 +285,11 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
       // 成長（召喚フェーズのみ）
       const growthOk = side === active && tapped?.effect?.action === "growth"
         && !tapped.acted && tapped.summonedTurn !== prev.turn && phase === "summon";
-      if (growthOk) return { ...prev, selectedGrowth: { col, idx, unit: tapped }, selectedUnit: null };
+      if (growthOk) return { ...prev, ...CLEAR_SEL, selectedGrowth: { col, idx, unit: tapped } };
       if (selectedGrowth) return { ...prev, selectedGrowth: null };
 
-      // 新規選択（行動フェーズ）
-      if (side === active && tapped && !tapped.acted && !tapped.stunned && !turn1block && phase !== "summon")
-        return { ...prev, selectedUnit: { col, idx } };
+      // 新規選択
+      if (side === active && canSelect(tapped)) return { ...prev, selectedUnit: { col, idx } };
 
       return prev;
     });
@@ -292,7 +326,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
       hand.splice(handIndex, 1);
       log.push(`${gu.name}が成長→${card.name}召喚`);
 
-      const ns = { ...prev, board, log, [hk]: hand, [gk]: grave, selectedGrowth: null, selectedUnit: null };
+      const ns = { ...prev, board, log, [hk]: hand, [gk]: grave, ...CLEAR_SEL };
       applyConditionals(ns, active);
       push();
       return ns;
@@ -312,13 +346,11 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
 
       // スペル・魔法はいつでも（盤面へのドロップで使用）
       if (isSpell) {
-        // 対象なし: 盤面のどこにドロップしても発動
         if (!card.targetType || card.targetType === "none") {
           const ns = activateCard(prev, active, handIndex, null);
           push();
           return ns;
         }
-        // 対象あり: ドロップ先が有効な対象ならそのまま発動
         if (row >= 0) {
           const { side, idx } = rowToCoord(row);
           const target = prev.board[side]?.[col]?.[idx];
@@ -328,8 +360,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
             return ns;
           }
         }
-        // 対象以外にドロップ: 対象選択（タップ）へ
-        return { ...prev, selectedSpell: { handIndex, card }, selectedUnit: null, selectedGrowth: null };
+        return { ...prev, ...CLEAR_SEL, selectedSpell: { handIndex, card } };
       }
 
       // ユニット・施設は召喚フェーズのみ
@@ -350,7 +381,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
   return {
     battle, confirmLeave,
     startBattle, requestBack, leaveToLobby, endTurn, nextPhase,
-    handleCellClick, handleSummon, handleGrowthSelect,
+    handleCellClick, handleSummon, handleGrowthSelect, handleAbility,
     setConfirmLeave, setBattle,
   };
-                                       }
+    }
