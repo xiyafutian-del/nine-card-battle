@@ -1,43 +1,22 @@
-import { useRef } from 'react';
 import { CardFace } from './CardDesign.jsx';
 import { TYPES } from '../constants/index.js';
 
+const isTouch = typeof window !== "undefined"
+  && ("ontouchstart" in window || (navigator.maxTouchPoints || 0) > 0);
+
 export function HandFan({
   hand, handCost, handDisabled, isGameOver, phase,
-  cardImages, onSummon,
+  cardImages, costOf,
   onDragStart, onDragEnd,
+  onTouchDragStart, onTouchDragMove, onTouchDragEnd,
   selectedGrowth, onGrowthSelect,
 }) {
-  const swipeRef = useRef({ startX: 0, startY: 0, idx: null, dragging: false });
-
   const inGrowthMode = !!selectedGrowth;
   const gEffect = selectedGrowth?.unit?.effect;
   const gAttrs = gEffect
     ? (Array.isArray(gEffect.filter?.attr) ? gEffect.filter.attr : [gEffect.filter?.attr])
     : [];
   const gMax = gEffect?.maxCost ?? 99;
-
-  function handTouchStart(e, i) {
-    const t = e.touches[0];
-    swipeRef.current = { startX: t.clientX, startY: t.clientY, idx: i, dragging: false };
-  }
-  function handTouchMove(e) {
-    const s = swipeRef.current;
-    if (s.idx == null) return;
-    if (e.cancelable) e.preventDefault();
-    const t = e.touches[0];
-    if (Math.abs(s.startY - t.clientY) > 12 || Math.abs(s.startX - t.clientX) > 12) s.dragging = true;
-  }
-  function handTouchEnd(e) {
-    const s = swipeRef.current;
-    if (s.idx == null) return;
-    if (s.dragging) {
-      const t = e.changedTouches[0];
-      const cell = document.elementFromPoint(t.clientX, t.clientY)?.closest?.('[data-cell]');
-      if (cell) onSummon(s.idx, Number(cell.dataset.row), Number(cell.dataset.col));
-    }
-    swipeRef.current = { startX: 0, startY: 0, idx: null, dragging: false };
-  }
 
   const n = hand.length;
 
@@ -46,10 +25,10 @@ export function HandFan({
       style={{ height: "100px", touchAction: "none" }}>
       {hand.map((card, i) => {
         const isSpellMagic = card.type === TYPES.SPELL || card.type === TYPES.MAGIC;
+        const eff = costOf ? costOf(card) : card.cost;   // 軽減後のコスト
         const isGrowthTarget = inGrowthMode && gAttrs.includes(card.attr) && card.cost <= gMax;
-        // 魔法・スペルはいつでも、ユニット・施設は召喚フェーズのみ（全てドラッグで使用）
         const phaseOk = isSpellMagic || phase === "summon";
-        const affordable = !inGrowthMode && handCost >= card.cost && !handDisabled && !isGameOver && phaseOk;
+        const affordable = !inGrowthMode && handCost >= eff && !handDisabled && !isGameOver && phaseOk;
         const usable = inGrowthMode ? isGrowthTarget : affordable;
 
         const offset = i - (n - 1) / 2;
@@ -60,16 +39,27 @@ export function HandFan({
         return (
           <div
             key={card._k || i}
-            draggable={affordable}
+            draggable={affordable && !isTouch}
             onClick={e => {
               e.stopPropagation();
               if (inGrowthMode && isGrowthTarget) onGrowthSelect(i);
             }}
             onDragStart={e => onDragStart(e, i, card)}
             onDragEnd={onDragEnd}
-            onTouchStart={e => { if (affordable) handTouchStart(e, i); }}
-            onTouchMove={handTouchMove}
-            onTouchEnd={handTouchEnd}
+            onTouchStart={e => {
+              if (!affordable) return;
+              const t = e.touches[0];
+              onTouchDragStart(i, card, t.clientX, t.clientY);
+            }}
+            onTouchMove={e => {
+              const t = e.touches[0];
+              onTouchDragMove(t.clientX, t.clientY);
+            }}
+            onTouchEnd={e => {
+              const t = e.changedTouches[0];
+              onTouchDragEnd(t.clientX, t.clientY);
+            }}
+            onTouchCancel={() => onTouchDragEnd(null, null)}
             className={`absolute bottom-0 ${usable ? "cursor-grab active:cursor-grabbing" : ""}`}
             style={{
               width: "59px", height: "86px",
@@ -82,7 +72,11 @@ export function HandFan({
             }}
           >
             <div className={`w-full h-full rounded-md ${usable ? "ring-2 ring-black shadow-lg" : "ring-1 ring-gray-300"}`}>
-              <CardFace card={card} image={cardImages?.[card.id] || card.image} skin={card.skin || null}/>
+              <CardFace
+                card={{ ...card, cost: eff }}
+                image={cardImages?.[card.id] || card.image}
+                skin={card.skin || null}
+              />
             </div>
           </div>
         );
