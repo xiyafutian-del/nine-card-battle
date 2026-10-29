@@ -10,6 +10,10 @@ function parseRange(r) {
 }
 
 // ============ カード定義ヘルパー ============
+// public/cards/{id}.webp を置いたカードのidをここに追加
+const IMAGE_IDS = [];
+const imageFor = id => (IMAGE_IDS.includes(id) ? `/cards/${id}.webp` : null);
+
 function card(id, name, cost, hp, atk, range, type, attr, extra = {}) {
   return {
     id, name, cost, hp, atk,
@@ -17,10 +21,11 @@ function card(id, name, cost, hp, atk, range, type, attr, extra = {}) {
     type: TYPES[type.toUpperCase()] || type,
     attr: ATTRS[attr.toUpperCase()] || attr,
     effect: extra.effect || null,
-    conditional: extra.conditional || null, // ← ここを追加！(条件付き効果を保持)
-    targetType: extra.targetType || null,   // ← ここを追加！(ターゲットタイプを保持)
+    conditional: extra.conditional || null,
+    targetType: extra.targetType || "none",
     tags: extra.tags || [],
     desc: extra.desc || "",
+    image: extra.image || imageFor(id),
   };
 }
 
