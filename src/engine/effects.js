@@ -78,8 +78,13 @@ export function applyAction(effect, targets, ctx, state) {
     }
     if (u.isCore) s.gameOver = tside === "blue" ? "red" : "blue";
     const at = s.board[tside][tcol].indexOf(u);
-    if (at >= 0) s.board[tside][tcol].splice(at, 1);
-  };
+    if (at >= 0) {
+      s.board[tside][tcol].splice(at, 1);
+      if (!u.isCore) {
+        const gk = tside === "blue" ? "playerGrave" : "aiGrave";
+        s = { ...s, [gk]: [...(s[gk] || []), unitToCard(u)] };
+      }
+    }
 
   switch (effect.action) {
     case "damage":
@@ -251,6 +256,7 @@ export function makeUnitFromCard(card) {
     acted: false, moved: false, stunned: false, overclocked: false,
     rotateDeg: 0, actCount: 0,
     summonedTurn: null,
+    src: { ...card },   // 墓地送り・山札戻しで元のカードに復元するため
     _k: card._k || ("k" + Math.random().toString(36).slice(2, 8) + (counter++)),
   };
 }
@@ -263,7 +269,19 @@ export function shuffle(arr) {
   }
   return a;
 }
-
+// ユニット → 墓地・山札に置くカードの形へ
+export function unitToCard(u) {
+  if (u.src) return { ...u.src };
+  return {
+    id: u.cardId, name: u.name, cost: u.originalCost ?? u.cost,
+    hp: u.maxHp, atk: u.baseAtk ?? u.atk,
+    hRange: u.hRange, vRange: u.baseVRange ?? u.vRange,
+    rangeType: u.rangeType, dRange: u.dRange,
+    type: u.type, attr: u.attr, effect: u.effect, conditional: u.conditional,
+    tags: u.baseTags || u.tags || [], desc: u.desc,
+    image: u.image, skin: u.skin, _k: u._k,
+  };
+}
 // ===== 条件付き効果・場の状況で変わるATK =====
 function checkCondition(cond, ctx) {
   const { unit, ci, ri, board, side, cost, hand } = ctx;
