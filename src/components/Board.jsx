@@ -9,7 +9,7 @@ const H = CELL * ROWS;
 
 export function Board({
   board, active, phase = "summon",
-  selectedUnit, selectedSpell, selectedGrowth, gameOver,
+  selectedUnit, selectedSpell, selectedGrowth, selectedAbility, gameOver,
   mode, turn, firstPlayer,
   draggingCard, onCellClick, onDragOver, onDrop, onDragLeave,
   dropPreview, playerGrave, aiGrave, playerDeck, aiDeck,
@@ -17,7 +17,7 @@ export function Board({
 }) {
   const enem = active === "blue" ? "red" : "blue";
   const turn1block = turn === 1 && active === firstPlayer;
-  const rowOf = i => (active === "blue" ? 3 + i : 2 - i); // 自陣のidx→行
+  const rowOf = i => (active === "blue" ? 3 + i : 2 - i);
 
   const attackSet = new Set();
   const moveSet = new Set();
@@ -26,11 +26,11 @@ export function Board({
   const spellSet = new Set();
 
   // 選択ユニット: 行動フェーズでは移動先（緑）と攻撃先（橙）を同時に表示
-  if (selectedUnit && !turn1block) {
+  if (selectedUnit) {
     const su = selectedUnit;
     const att = board[active][su.col]?.[su.idx];
     selSet.add(`${active}-${su.col}-${su.idx}`);
-    if (att && phase === "action") {
+    if (att && phase === "action" && !turn1block && !att.acted) {
       getAttackTargets(active, su.col, su.idx, att, board)
         .forEach(t => attackSet.add(`${enem}-${t.col}-${t.idx}`));
       if (!att.moved)
@@ -47,6 +47,15 @@ export function Board({
     }));
   }
   if (selectedGrowth) selSet.add(`${active}-${selectedGrowth.col}-${selectedGrowth.idx}`);
+
+  // 場の能力: 入れ替え先の壁を表示
+  if (selectedAbility) {
+    selSet.add(`${active}-${selectedAbility.col}-${selectedAbility.idx}`);
+    board[active].forEach((colArr, c) => colArr.forEach((u, i) => {
+      if (u?.attr === "wall" && !(c === selectedAbility.col && i === selectedAbility.idx))
+        spellSet.add(`${active}-${c}-${i}`);
+    }));
+  }
 
   // 対象指定スペルの対象候補（選択中 または ドラッグ中）
   const dragSpell = draggingCard && (draggingCard.card.type === "spell" || draggingCard.card.type === "magic")
@@ -78,7 +87,6 @@ export function Board({
     }
   }
 
-  // 施設の割り込みで押し出されるユニット
   const pushedUnits = new Set();
   if (dropPreview) {
     board[active][dropPreview.col]?.forEach((u, i) => {
@@ -147,7 +155,6 @@ export function Board({
         </div>
       </div>
 
-      {/* サイドパネル */}
       <div className="flex flex-col justify-between flex-shrink-0" style={{ width: "36px" }}>
         <div className="flex flex-col gap-1">
           <SideBox label="デッキ" count={flipped ? playerDeck : aiDeck}/>
@@ -170,4 +177,4 @@ function SideBox({ label, count }) {
       <div className="text-lg font-bold leading-tight">{count}</div>
     </div>
   );
-}
+                  }
