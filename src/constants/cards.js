@@ -11,8 +11,35 @@ function parseRange(r) {
 
 // ============ カード定義ヘルパー ============
 // public/cards/{id}.webp を置いたカードのidをここに追加
-const IMAGE_IDS = [];
-const imageFor = id => (IMAGE_IDS.includes(id) ? `/cards/${id}.webp` : null);
+// src/assets/cards/ に置いた画像を自動で拾う（idがファイル名）
+// ===== src/assets/cards/ の画像を自動で割り当て =====
+const imageUrls = import.meta.glob('../assets/cards/*.{webp,png,jpg,jpeg}', {
+  eager: true, query: '?url', import: 'default',
+});
+const mapFiles = import.meta.glob('../assets/cards/map.json', {
+  eager: true, import: 'default',
+});
+
+const URL_BY_FILE = {};
+Object.entries(imageUrls).forEach(([p, u]) => { URL_BY_FILE[p.split('/').pop()] = u; });
+
+// map.json: { "ファイル名": カード名 または カードid }
+const FILE_FOR = {};
+Object.values(mapFiles).forEach(m =>
+  Object.entries(m).forEach(([file, who]) => { FILE_FOR[String(who)] = file; }));
+
+function imageFor(id, name) {
+  const file = FILE_FOR[String(id)] || FILE_FOR[name];
+  if (file && URL_BY_FILE[file]) return URL_BY_FILE[file];
+  // map.json に無い場合は「カード名.拡張子」「カードid.拡張子」を探す
+  for (const key of [name, String(id)])
+    for (const ext of ["webp", "png", "jpg", "jpeg"]) {
+      const u = URL_BY_FILE[`${key}.${ext}`];
+      if (u) return u;
+    }
+  return null;
+}
+
 
 function card(id, name, cost, hp, atk, range, type, attr, extra = {}) {
   return {
