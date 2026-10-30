@@ -59,6 +59,20 @@ export function resolveTargets(target, ctx) {
   }
 }
 
+// ===== ユニット → 墓地・山札に置くカードの形へ =====
+export function unitToCard(u) {
+  if (u.src) return { ...u.src };
+  return {
+    id: u.cardId, name: u.name, cost: u.originalCost ?? u.cost,
+    hp: u.maxHp, atk: u.baseAtk ?? u.atk,
+    hRange: u.hRange, vRange: u.baseVRange ?? u.vRange,
+    rangeType: u.rangeType, dRange: u.dRange,
+    type: u.type, attr: u.attr, effect: u.effect, conditional: u.conditional,
+    tags: u.baseTags || u.tags || [], desc: u.desc,
+    image: u.image, skin: u.skin, _k: u._k,
+  };
+}
+
 // ===== アクション実行 =====
 export function applyAction(effect, targets, ctx, state) {
   const { side, col, idx, log } = ctx;
@@ -72,11 +86,13 @@ export function applyAction(effect, targets, ctx, state) {
     u.hp -= amount;
     say(`${u.name}に${amount}ダメージ`);
     if (u.hp > 0) return;
+
     if (u.effect?.trigger === "on_death") {
       const dctx = { ...ctx, board: s.board, side: tside, col: tcol, idx: tidx };
       s = applyAction(u.effect, resolveTargets(u.effect.target, dctx), dctx, s);
     }
     if (u.isCore) s.gameOver = tside === "blue" ? "red" : "blue";
+
     const at = s.board[tside][tcol].indexOf(u);
     if (at >= 0) {
       s.board[tside][tcol].splice(at, 1);
@@ -85,6 +101,7 @@ export function applyAction(effect, targets, ctx, state) {
         s = { ...s, [gk]: [...(s[gk] || []), unitToCard(u)] };
       }
     }
+  };
 
   switch (effect.action) {
     case "damage":
@@ -269,19 +286,7 @@ export function shuffle(arr) {
   }
   return a;
 }
-// ユニット → 墓地・山札に置くカードの形へ
-export function unitToCard(u) {
-  if (u.src) return { ...u.src };
-  return {
-    id: u.cardId, name: u.name, cost: u.originalCost ?? u.cost,
-    hp: u.maxHp, atk: u.baseAtk ?? u.atk,
-    hRange: u.hRange, vRange: u.baseVRange ?? u.vRange,
-    rangeType: u.rangeType, dRange: u.dRange,
-    type: u.type, attr: u.attr, effect: u.effect, conditional: u.conditional,
-    tags: u.baseTags || u.tags || [], desc: u.desc,
-    image: u.image, skin: u.skin, _k: u._k,
-  };
-}
+
 // ===== 条件付き効果・場の状況で変わるATK =====
 function checkCondition(cond, ctx) {
   const { unit, ci, ri, board, side, cost, hand } = ctx;
@@ -319,29 +324,4 @@ export function applyConditionals(state, side) {
     const cost = s === "blue" ? state.playerCost : state.aiCost;
     const hand = (s === "blue" ? state.playerHand : state.aiHand) || [];
 
-    state.board[s].forEach((col, ci) => col.forEach((unit, ri) => {
-      if (!unit) return;
-      const fieldAtk = unit.effect?.action === "atk_plus_by_field";
-      if (!unit.conditional && !fieldAtk) return;
-
-      unit.atk    = (unit.baseAtk ?? unit.atk) + (unit.atkTempUp || 0);
-      unit.vRange = unit.baseVRange ?? unit.vRange;
-      unit.tags   = [...(unit.baseTags || unit.tags || [])];
-
-      // 龍王: 場の他の指定属性1体につきATK+amount
-      if (fieldAtk) {
-        const attrs = attrList(unit.effect.filter);
-        const n = state.board[s].flat().filter(u => u && u !== unit && attrs.includes(u.attr)).length;
-        unit.atk += n * (unit.effect.amount || 1);
-      }
-
-      const list = Array.isArray(unit.conditional) ? unit.conditional
-        : unit.conditional ? [unit.conditional] : [];
-      list.forEach(({ condition, effect }) => {
-        if (checkCondition(condition, { unit, ci, ri, board: state.board, side: s, cost, hand }))
-          applyCondEffect(effect, unit);
-      });
-    }));
-  });
-  return state;
-          }
+    state.board[s].forEach((col, ci)
