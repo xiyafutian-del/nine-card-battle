@@ -324,4 +324,29 @@ export function applyConditionals(state, side) {
     const cost = s === "blue" ? state.playerCost : state.aiCost;
     const hand = (s === "blue" ? state.playerHand : state.aiHand) || [];
 
-    state.board[s].forEach((col, ci)
+    state.board[s].forEach((col, ci) => col.forEach((unit, ri) => {
+      if (!unit) return;
+      const fieldAtk = unit.effect?.action === "atk_plus_by_field";
+      if (!unit.conditional && !fieldAtk) return;
+
+      unit.atk    = (unit.baseAtk ?? unit.atk) + (unit.atkTempUp || 0);
+      unit.vRange = unit.baseVRange ?? unit.vRange;
+      unit.tags   = [...(unit.baseTags || unit.tags || [])];
+
+      // 龍王: 場の他の指定属性1体につきATK+amount
+      if (fieldAtk) {
+        const attrs = attrList(unit.effect.filter);
+        const n = state.board[s].flat().filter(u => u && u !== unit && attrs.includes(u.attr)).length;
+        unit.atk += n * (unit.effect.amount || 1);
+      }
+
+      const list = Array.isArray(unit.conditional) ? unit.conditional
+        : unit.conditional ? [unit.conditional] : [];
+      list.forEach(({ condition, effect }) => {
+        if (checkCondition(condition, { unit, ci, ri, board: state.board, side: s, cost, hand }))
+          applyCondEffect(effect, unit);
+      });
+    }));
+  });
+  return state;
+}
