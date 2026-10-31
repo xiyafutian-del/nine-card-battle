@@ -1,7 +1,8 @@
 import { TYPES, MAX_TURNS, getGeneratorCost } from '../constants/index.js';
 import { makeUnitFromCard, shuffle, resolveTargets, applyAction,
-         calcForgeBonus, calcPassiveCostReduction, getEffectiveCost,unitToCard,
-         applyConditionals } from './effects.js';
+         calcForgeBonus, calcPassiveCostReduction, getEffectiveCost,
+         unitToCard, applyConditionals } from './effects.js';
+
 export function cloneBoard(board) {
   return {
     blue: board.blue.map(col => col.map(u => ({ ...u }))),
@@ -75,16 +76,19 @@ export function getAttackTargets(side, col, idx, unit, board) {
 }
 
 // ===== 移動 =====
+// 縦移動は隣に別のユニットがいる場合のみ（入れ替え）。横移動は隣の列の空きがあれば可
 export function getMovable(side, col, idx, board) {
   const unit = board[side][col][idx];
   if (!unit || unit.isFacility || unit.moved) return [];
   const result = [];
-  [[0,-1],[0,1],[-1,0],[1,0]].forEach(([dc, di]) => {
+  [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(([dc, di]) => {
     const nc = col + dc, ni = idx + di;
     if (nc < 0 || nc > 2 || ni < 0 || ni > 2) return;
-    if (dc === 0) { if (ni < board[side].length && ni < board[side][col].length) result.push({ col: nc, idx: ni }); }
-    else if (board[side][nc].length < 3)
+    if (dc === 0) {
+      if (ni < board[side][col].length) result.push({ col: nc, idx: ni });
+    } else if (board[side][nc].length < 3) {
       result.push({ col: nc, idx: Math.min(ni, board[side][nc].length) });
+    }
   });
   return result;
 }
@@ -230,7 +234,7 @@ export function attackUnit(state, side, atkCol, atkIdx, defCol, defIdx) {
 
   // 機械属リンク
   if (attacker.attr === "machine") {
-    [[atkCol-1,atkIdx],[atkCol+1,atkIdx],[atkCol,atkIdx-1],[atkCol,atkIdx+1]].forEach(([c2,i2]) => {
+    [[atkCol - 1, atkIdx], [atkCol + 1, atkIdx], [atkCol, atkIdx - 1], [atkCol, atkIdx + 1]].forEach(([c2, i2]) => {
       const u = board[side][c2]?.[i2];
       if (!u || u.attr !== "machine" || u.effect?.trigger !== "link_machine") return;
       const ctx = { board, side, col: c2, idx: i2, log };
@@ -260,6 +264,12 @@ export function attackUnit(state, side, atkCol, atkIdx, defCol, defIdx) {
       }
     }
   }
+
+  const vc = checkVictory(board, state.turn);
+  if (vc.over && !ns.gameOver) ns.gameOver = vc.winner;
+  applyConditionals(ns, side);
+  return ns;
+}
 
 // ===== スペル/魔法 =====
 export function activateCard(state, side, handIndex, targetInfo) {
@@ -300,4 +310,4 @@ export function activateCard(state, side, handIndex, targetInfo) {
   if (vc.over && !ns.gameOver) ns.gameOver = vc.winner;
   applyConditionals(ns, side);
   return ns;
-}
+           }
