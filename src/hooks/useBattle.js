@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { CORE_CARD } from '../constants/cards.js';
 import { makeUnitFromCard, applyConditionals, unitToCard } from '../engine/effects.js';
@@ -142,7 +141,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
           if (!u) continue;
           if (u.atkTempUp) { u.atk -= u.atkTempUp; u.atkTempUp = 0; }
           if (u.overclocked) {
-                        grave.push(unitToCard(col.splice(i, 1)[0]));
+            grave.push(unitToCard(col.splice(i, 1)[0]));
             log.push(`${u.name}はオーバークロックで破壊された`);
           }
         }
@@ -384,4 +383,4 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
     handleCellClick, handleSummon, handleGrowthSelect, handleAbility,
     setConfirmLeave, setBattle,
   };
-    }
+                  }
