@@ -1,7 +1,7 @@
-import { TYPES, MAX_TURNS, getGeneratorCost } from '../constants/index.js';
 import { makeUnitFromCard, shuffle, resolveTargets, applyAction,
          calcForgeBonus, calcPassiveCostReduction, getEffectiveCost,
-         unitToCard, applyConditionals } from './effects.js';
+         unitToCard } from './effects.js';
+import { applyConditionals } from './conditionals.js';
 
 export function cloneBoard(board) {
   return {
