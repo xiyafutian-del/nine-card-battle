@@ -6,6 +6,7 @@ import { CardFace } from '../components/CardDesign.jsx';
 import { rowToCoord } from '../engine/battle.js';
 import { getEffectiveCost } from '../engine/effects.js';
 import { GENERATOR_INFO } from '../constants/index.js';
+import { skillReady } from '../engine/skills.js';
 
 const PHASE_LABEL = { summon: "召喚", action: "行動" };
 const isSpellCard = c => c.type === "spell" || c.type === "magic";
@@ -144,6 +145,7 @@ export function BattleScreen({
   else if (selectedGrowth) guideText = "成長で出す手札のカードをタップ";
   else if (draggingCard) guideText = isSpellCard(draggingCard.card) ? "盤面で離すと使用 / 外で離すとキャンセル" : "＋マスへドロップ（ユニットは最後尾）";
   else if (phase === "summon") guideText = "";
+      else if (selUnit && skillReady(selUnit)) guideText = "もう一度タップでスキル発動 / 他をタップでキャンセル";
   else if (turn1block) guideText = "先行1T目は移動・攻撃不可";
   else if (selectedUnit) guideText = "緑=移動先 / 橙=攻撃先 / 他タップでキャンセル";
   else guideText = "行動するユニットをタップ";
