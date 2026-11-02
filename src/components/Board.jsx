@@ -121,7 +121,7 @@ export function Board({
               const isInsert = dropPreview && side === active && col === dropPreview.col && idx === dropPreview.insertIdx;
 
               let bg = "transparent";
-              if (selSet.has(unitKey)) bg = "rgba(0,0,0,0.10)";
+              if (selSet.has(unitKey)) bg = (selectedUnit && unit && skillReady(unit)) ? "rgba(255,190,0,0.35)" : "rgba(0,0,0,0.10)";
               else if (attackSet.has(unitKey)) bg = "rgba(255,100,0,0.18)";
               else if (moveSet.has(unitKey)) bg = "rgba(0,180,0,0.15)";
               else if (spellSet.has(unitKey)) bg = "rgba(255,190,0,0.22)";
