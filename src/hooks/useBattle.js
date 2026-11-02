@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { CORE_CARD } from '../constants/cards.js';
-import { makeUnitFromCard, applyConditionals, unitToCard } from '../engine/effects.js';
+import { makeUnitFromCard, unitToCard, resolveTargets, applyAction } from '../engine/effects.js';
+import { applyConditionals } from '../engine/conditionals.js';
+import { canOverclock, canUseActive, skillReady } from '../engine/skills.js';
 import { cloneBoard, buildDeck, checkVictory, applyTurnStart,
          summonUnit, attackUnit, activateCard,
          getAttackTargets, getMovable, rowToCoord } from '../engine/battle.js';
@@ -20,7 +22,7 @@ function isValidSpellTarget(card, active, side, unit) {
   }
 }
 
-// 場の能力（サンドゴーレム: 壁と位置を入れ替え）を持つか
+// 場の能力（サンドゴーレム: 壁と位置を入れ替え）を持つか。「入替」ボタンで使う
 const hasAbility = u => u?.effect?.trigger === "activate" && u?.effect?.action === "swap_self";
 
 const findSkin = (deckSkins, ownedSkins, key) => {
@@ -31,6 +33,52 @@ const findSkin = (deckSkins, ownedSkins, key) => {
 // フェーズは「召喚 → 行動（移動・攻撃）」の2段階。戻れない
 const PHASE_ORDER = ["summon", "action"];
 const CLEAR_SEL = { selectedUnit: null, selectedSpell: null, selectedGrowth: null, selectedAbility: null };
+
+// ターン開始時: 手番側のスキル使用済みを解除
+const resetSkills = (state, side) => {
+  state.board[side].forEach(col => col.forEach(u => { if (u) u.abilityUsed = false; }));
+  return state;
+};
+
+// スキル発動（オーバークロック / 能動スキル）
+function runSkill(prev, col, idx) {
+  const active = prev.active;
+  const board = cloneBoard(prev.board);
+  const u = board[active][col]?.[idx];
+  if (!u) return prev;
+  const log = [...prev.log];
+
+  // オーバークロック: 追加行動を得る（そのターン終了時に破壊）
+  if (canOverclock(u)) {
+    u.acted = false; u.stunned = false; u.actCount = 0; u.moved = false;
+    u.rotateDeg = 0; u.overclocked = true;
+    log.push(`${u.name}がオーバークロック`);
+    const ns = { ...prev, board, log, ...CLEAR_SEL };
+    applyConditionals(ns, active);
+    return ns;
+  }
+
+  // 能動スキル（1ターン1回。consumesAction が false でなければ行動を消費）
+  if (canUseActive(u)) {
+    const e = u.effect;
+    log.push(`${u.name}がスキルを発動`);
+    const ctx = { board, side: active, col, idx, log };
+    let ns = applyAction(e, resolveTargets(e.target || "self", ctx), ctx, { ...prev, board, log });
+    const me = ns.board[active].flat().find(x => x.uid === u.uid);
+    if (me) {
+      me.abilityUsed = true;
+      if (e.consumesAction !== false) {
+        me.acted = true;
+        me.rotateDeg = (me.rotateDeg || 0) - 90;
+      }
+    }
+    const vc = checkVictory(ns.board, prev.turn);
+    if (vc.over && !ns.gameOver) ns = { ...ns, gameOver: vc.winner };
+    applyConditionals(ns, active);
+    return { ...ns, ...CLEAR_SEL };
+  }
+  return prev;
+}
 
 function initBattle(mode, cardPool, deckCounts, playerGenerator, deckSkins, ownedSkins, deckName) {
   const name = deckName || "noname";
@@ -88,6 +136,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
             }));
             ns = { ...ns, board, active: "blue", turn: prev.turn + 1, ...CLEAR_SEL };
             ns = applyTurnStart(ns, "blue", prev.playerGenerator);
+            resetSkills(ns, "blue");
             ns.log = [...ns.log, `あなたのターン (Turn ${ns.turn})`];
           }
           return ns;
@@ -152,13 +201,14 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
 
       let ns = { ...prev, board, [gk]: grave, log, active: next, turn: prev.turn + 1, ...CLEAR_SEL };
       ns = applyTurnStart(ns, next, next === "blue" ? prev.playerGenerator : prev.aiGenerator);
+      resetSkills(ns, next);
       ns.log = [...ns.log, `${next === "blue" ? "あなた" : "相手"}のターン (Turn ${ns.turn})`];
       return ns;
     });
     push();
   }
 
-  // ===== 場の能力の発動準備（選択中のユニットから） =====
+  // ===== 場の能力の発動準備（サンドゴーレム: 「入替」ボタン） =====
   function handleAbility() {
     setBattle(prev => {
       if (!prev || prev.gameOver || !prev.selectedUnit) return prev;
@@ -209,17 +259,6 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
         return { ...prev, ...CLEAR_SEL };
       }
 
-      // オーバークロック発動（行動済みの自軍ユニットをタップ）
-      if (!selectedSpell && side === active && tapped?.tags?.includes("オーバークロック")
-          && tapped.acted && !tapped.overclocked) {
-        const board = cloneBoard(prev.board);
-        const u = board[active][col][idx];
-        u.acted = false; u.stunned = false; u.actCount = 0; u.moved = false;
-        u.rotateDeg = 0; u.overclocked = true;
-        push();
-        return { ...prev, board, ...CLEAR_SEL, log: [...prev.log, `${u.name}がオーバークロック`] };
-      }
-
       // スペル対象指定中
       if (selectedSpell) {
         const { handIndex, card } = selectedSpell;
@@ -229,9 +268,9 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
         return { ...ns, selectedSpell: null };
       }
 
-      // 選択できるか: 行動フェーズで未行動 / 場の能力持ちはいつでも
+      // 選択できるか: 行動フェーズで未行動 / 場の能力持ち / スキル発動できる状態
       const canSelect = u => !!u && (
-        (!u.acted && !u.stunned && phase !== "summon" && !turn1block) || hasAbility(u)
+        (!u.acted && !u.stunned && phase !== "summon" && !turn1block) || hasAbility(u) || skillReady(u)
       );
 
       // ユニット選択中
@@ -239,6 +278,16 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
         const su = selectedUnit;
         const attacker = prev.board[active][su.col]?.[su.idx];
         if (!attacker) return { ...prev, selectedUnit: null };
+
+        // 選択中の自身をもう一度タップ: スキル発動（使えなければ選択解除）
+        if (side === active && su.col === col && su.idx === idx) {
+          if (skillReady(attacker)) {
+            push();
+            return runSkill(prev, col, idx);
+          }
+          return { ...prev, selectedUnit: null };
+        }
+
         const canAct = phase === "action" && !turn1block && !attacker.acted && !attacker.stunned;
 
         // 攻撃（行動フェーズ）
@@ -275,8 +324,7 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
             }
           }
           // 別ユニットに選択切替
-          const same = su.col === col && su.idx === idx;
-          if (!same && canSelect(tapped)) return { ...prev, selectedUnit: { col, idx } };
+          if (canSelect(tapped)) return { ...prev, selectedUnit: { col, idx } };
         }
         return { ...prev, selectedUnit: null };
       }
@@ -383,4 +431,4 @@ export function useBattle(cardPool, deckCounts, playerGenerator, onAction, deckS
     handleCellClick, handleSummon, handleGrowthSelect, handleAbility,
     setConfirmLeave, setBattle,
   };
-                  }
+}
