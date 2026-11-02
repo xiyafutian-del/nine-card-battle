@@ -1,5 +1,6 @@
 import { UnitCell } from './CardDesign.jsx';
 import { rowToCoord, getAttackTargets, getMovable } from '../engine/battle.js';
+import { skillReady } from '../engine/skills.js';
 
 const CELL = 90;
 const COLS = 3;
