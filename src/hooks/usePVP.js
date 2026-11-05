@@ -154,7 +154,8 @@ export function usePVP(onStateUpdate) {
     flush();
   }
 
-  function leaveRoom() {
+  // finished=true（決着後に出る）なら、相手に最終状態が届く時間を待ってから部屋を削除
+  function leaveRoom(finished = false) {
     const id = roomIdRef.current;
     const wasWaitingHost = roleRef.current === "host" && statusRef.current === "waiting";
 
@@ -168,12 +169,11 @@ export function usePVP(onStateUpdate) {
     setRoomId(""); setPvpRole(null); setAbsentSec(0); setError("");
     setStatus("idle");
 
-    // 待機中に閉じた部屋は削除（後から入室されないように）
-    if (id && wasWaitingHost) {
-      supabase.from("rooms").delete().eq("id", id).then(() => {}, () => {});
-    }
+    const remove = () => supabase.from("rooms").delete().eq("id", id).then(() => {}, () => {});
+    if (id && wasWaitingHost) remove();                 // 待機中に閉じた部屋はすぐ削除
+    else if (id && finished) setTimeout(remove, 5000);  // 決着後の部屋は5秒後に削除
   }
-
+  
   useEffect(() => {
     const t = setInterval(() => {
       const since = absentSinceRef.current;
