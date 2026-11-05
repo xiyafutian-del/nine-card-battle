@@ -152,16 +152,17 @@ export default function App() {
     }
   }
 
+   // ロビーへ戻る: 対戦中は確認ダイアログを出すだけ（「戻る」で handleLeaveToLobby）
   function handleRequestBack() {
-    if (battle?.mode === "pvp") leaveRoom();
-    requestBack();
-    setScreen("lobby");
+    if (battle && !battle.gameOver) { setConfirmLeave(true); return; }
+    handleLeaveToLobby();
   }
   function handleLeaveToLobby() {
-    if (battle?.mode === "pvp") leaveRoom();
+    if (battle?.mode === "pvp") leaveRoom(!!battle.gameOver);   // 決着後なら部屋を削除
     leaveToLobby();
     setScreen("lobby");
   }
+  
     // PVP待機をやめる（部屋を閉じて、作りかけの盤面も破棄）
   function handleCancelRoom() {
     leaveRoom();
