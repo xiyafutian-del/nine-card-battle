@@ -125,18 +125,26 @@ export function checkVictory(board, turn) {
 }
 
 // ===== ターン開始 =====
+// 発電機: 先攻のターンが始まる時（= ラウンドの始まり）に、両プレイヤーが
+// 自分の発電機の分のコストを得る。ラウンド = 先攻・後攻が1回ずつ動く単位
 export function applyTurnStart(state, side, generatorType) {
   const hand = side === "blue" ? [...state.playerHand] : [...state.aiHand];
   const deck = side === "blue" ? [...state.playerDeck] : [...state.aiDeck];
   let cost = side === "blue" ? state.playerCost : state.aiCost;
+  let otherCost = side === "blue" ? state.aiCost : state.playerCost;
   const log = [...state.log];
   const board = cloneBoard(state.board);
 
   if (deck.length > 0 && hand.length < 10) hand.push(deck.shift());
 
-  const gained = getGeneratorCost(generatorType || "water", state.turn);
-  cost += gained;
-  log.push(`${side === "blue" ? "あなた" : "相手"}コスト+${gained}`);
+  if (side === (state.firstPlayer || "blue")) {
+    const round = Math.ceil(state.turn / 2);
+    const gBlue = getGeneratorCost(state.playerGenerator || "water", round);
+    const gRed  = getGeneratorCost(state.aiGenerator || "water", round);
+    cost      += side === "blue" ? gBlue : gRed;
+    otherCost += side === "blue" ? gRed : gBlue;
+    log.push(`ラウンド${round}: 🔵+${gBlue} / 🔴+${gRed}`);
+  }
 
   // 回転を時計回り90度戻す（0度は超えない）・行動状態リセット
   board[side].forEach(col => col.forEach(u => {
@@ -159,8 +167,8 @@ export function applyTurnStart(state, side, generatorType) {
   }));
 
   const upd = side === "blue"
-    ? { playerHand: hand, playerDeck: deck, playerCost: cost }
-    : { aiHand: hand, aiDeck: deck, aiCost: cost };
+    ? { playerHand: hand, playerDeck: deck, playerCost: cost, aiCost: otherCost }
+    : { aiHand: hand, aiDeck: deck, aiCost: cost, playerCost: otherCost };
   const newState = { ...state, board, log, ...upd, phase: "summon" };
   applyConditionals(newState, side);
   return newState;
