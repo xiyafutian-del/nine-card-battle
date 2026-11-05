@@ -1,6 +1,7 @@
 import { UnitCell } from './CardDesign.jsx';
 import { rowToCoord, getAttackTargets, getMovable } from '../engine/battle.js';
 import { skillReady } from '../engine/skills.js';
+import { clickSuppressed } from './zoomContext.js';
 
 const CELL = 90;
 const COLS = 3;
@@ -132,7 +133,7 @@ export function Board({
                 <div key={`${row}-${col}`}
                   data-cell="1" data-row={row} data-col={col}
                   style={{ width: `${CELL}px`, height: `${CELL}px`, backgroundColor: bg, position: "relative", zIndex: 1 }}
-                  onClick={e => { e.stopPropagation(); if (!gameOver) onCellClick(row, col); }}
+                  onClick={e => { e.stopPropagation(); if (clickSuppressed()) return; if (!gameOver) onCellClick(row, col); }}
                   onDragOver={e => onDragOver(e, row, col)}
                   onDrop={e => onDrop(e, row, col)}>
                   {isDrop && !unit && (
