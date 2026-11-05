@@ -1,4 +1,5 @@
 import { CardFace } from './CardDesign.jsx';
+import { clickSuppressed } from './zoomContext.js';
 import { TYPES } from '../constants/index.js';
 
 const isTouch = typeof window !== "undefined"
@@ -42,6 +43,7 @@ export function HandFan({
             draggable={affordable && !isTouch}
             onClick={e => {
               e.stopPropagation();
+              if (clickSuppressed()) return;   // 長押し拡大の直後は無視
               if (inGrowthMode && isGrowthTarget) onGrowthSelect(i);
             }}
             onDragStart={e => onDragStart(e, i, card)}
