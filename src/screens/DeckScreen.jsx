@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { ATTR_LABELS, GENERATOR_INFO, TYPES } from '../constants/index.js';
 import { CardGrid } from '../components/CardDesign.jsx';
 import { SkinPreview } from '../components/SkinFrame.jsx';
-import { getOwnedSkins, getDeckSkins, setCardSkin, getUsedSkinIds } from '../skins/skinManager.js';
+import { getOwnedSkins, getDeckSkins, setCardSkin, getUsedSkinIds, pruneDeckSkins, renameDeckSkins } from '../skins/skinManager.js';
 
 const DECK_SIZE = 15;
 const EMPTY_DECK = { name: "", counts: {}, generator: "water" };
@@ -35,7 +35,7 @@ export function DeckScreen({ cardPool, cardImages, onBack, activeDeck, onActiveD
     setDeckSkins(getDeckSkins());
     setUsedIds(getUsedSkinIds());
   }
-  useEffect(() => { refreshSkins(); }, []);
+    useEffect(() => { pruneDeckSkins(decks); refreshSkins(); }, []);
 
   const cardKey = (deckName, cardId, index) => `${deckName || "noname"}-${cardId}-${index}`;
 
@@ -48,9 +48,16 @@ export function DeckScreen({ cardPool, cardImages, onBack, activeDeck, onActiveD
     if (!editing.name.trim()) { alert("デッキ名を入力してください"); return; }
     if (!deckValid) { alert(`デッキは${DECK_SIZE}枚ちょうどにしてください（現在${deckTotal}枚）`); return; }
     const newDecks = [...decks];
-    if (editingIdx !== null) newDecks[editingIdx] = editing;
-    else { newDecks.push(editing); setEditingIdx(newDecks.length - 1); }
+    if (editingIdx !== null) {
+      renameDeckSkins(decks[editingIdx]?.name, editing.name);  // 名前を変えてもスキンを引き継ぐ
+      newDecks[editingIdx] = editing;
+    } else {
+      newDecks.push(editing);
+      setEditingIdx(newDecks.length - 1);
+    }
     saveDecks(newDecks);
+    pruneDeckSkins(newDecks);   // 減らした枚数分などの不要な割り当てを解除
+    refreshSkins();
     onActiveDeckChange(editing);
     alert("保存しました！");
   }
@@ -61,11 +68,14 @@ export function DeckScreen({ cardPool, cardImages, onBack, activeDeck, onActiveD
     onActiveDeckChange(decks[idx]);
   }
 
-  function deleteDeck(idx) {
-    saveDecks(decks.filter((_, i) => i !== idx));
+   function deleteDeck(idx) {
+    const newDecks = decks.filter((_, i) => i !== idx);
+    saveDecks(newDecks);
+    pruneDeckSkins(newDecks);
+    refreshSkins();
     if (editingIdx === idx) { setEditing({ ...EMPTY_DECK }); setEditingIdx(null); }
     else if (editingIdx !== null && editingIdx > idx) setEditingIdx(editingIdx - 1);
-  }
+   }
 
   function newDeck() { setEditing({ ...EMPTY_DECK }); setEditingIdx(null); }
 
