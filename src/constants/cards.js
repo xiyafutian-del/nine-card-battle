@@ -65,20 +65,26 @@ export const CORE_CARD = {
 
 export const INITIAL_CARDS = [
   // ── 無属性ユニット ──
-  card(1,  "ソルジャー",        1, 1,  2, "1.1", "unit",     "none"),
-  card(2,  "シールドガード",     1, 3,  1, "1.1", "unit",     "none"),
-  card(3,  "アーチャー",         1, 1,  1, "d2", "unit",     "none"),
-  card(4,  "アサシン",           2, 1,  4, "1.1", "unit",     "none"),
-  card(5,  "ランサー",           2, 4,  2, "1.2", "unit",     "none"),
-  card(6,  "メイジ",             2, 1,  2, "3.2", "unit",     "none"),
-  card(7,  "ファランクス",       4, 6,  3, "3.1", "unit",     "none"),
-  card(8,  "ヘビーアーマー",     4, 8,  2, "1.1", "unit",     "none",{ tags:["タンク"] }),
-  card(9,  "スナイパー",         5, 1,  4, "d3", "unit",     "none"),
-  card(10, "茂み",           0, 1,  0, "1.1", "unit",     "none"),
-  card(11, "バリスタ",           5, 5,  3, "3.2", "unit",     "none"),
-  card(12, "ドラゴン",           9, 9, 6, "3.3", "unit",     "none"),
-  card(13, "カカシ",       1, 1,  0, "1.1", "tank", "none", { tags:["タンク"] }),
-  card(14, "バスティオン",   7, 10, 4, "1.2", "tank", "none", { tags:["タンク"] }),
+  card(0001,  "ソルジャー",        2, 1,  2, "1.1", "unit",     "none"),
+  card(0002,  "シールドガード",     2, 3,  1, "1.1", "unit",     "none"),
+  card(0003,  "アーチャー",         2, 1,  1, "d2", "unit",     "none"),
+  card(0004,  "アサシン",           3, 1,  4, "1.1", "unit",     "none"),
+  card(0005,  "ランサー",           4, 4,  2, "1.2", "unit",     "none"),
+  card(0006,  "メイジ",             4, 1,  2, "3.2", "unit",     "none"),
+  card(0007,  "ファランクス",       7, 6,  3, "3.1", "unit",     "none"),
+  card(0008,  "ヘビーアーマー",     7, 8,  2, "1.1", "unit",     "none",{ tags:["タンク"] }),
+  card(0009,  "スナイパー",         9, 1,  4, "d3", "unit",     "none"),
+  card(0011, "バリスタ",           9, 5,  3, "3.2", "unit",     "none"),
+  card(0012, "ドラゴン",           15, 9, 6, "3.3", "unit",     "none"),
+  card(0013, "カカシ",       1, 1,  0, "1.1", "tank", "none", { tags:["タンク"] }),
+  card(0014, "バスティオン",   14, 10, 4, "1.2", "tank", "none", { tags:["タンク"] }),
+  //日本
+card(1101,  "侍",        2, 2,  2, "1.1", "unit",     "none",{ tags:["先制"] }),
+card(1102,  "小次郎",        6, 5,  2, "3.1", "unit",     "none",{ tags:["2回行動"] }),
+card(1103,  "忍者",        4, 2,  3, "3.1", "unit",     "none",{ tags:["先制","速攻"] }),
+card(1104,  "火縄銃",        3, 3,  4, "1.3", "unit",     "none",{ tags:["速攻","反動"] }),
+card(1109,  "狐",        9, 7,  2, "３.3", "unit",     "none",{ tags:["先制","2回行動"] }),
+
   // ── 施設 ──
   card(15, "畑",     92, 3, 0, "1.1", "facility", "none",
     { effect:{ trigger:"turn_start", action:"gain_cost", amount:1 },
@@ -89,13 +95,13 @@ export const INITIAL_CARDS = [
   card(17, "鍛冶場", 104, 4, 0, "1.1", "facility", "none",
     { effect:{ trigger:"passive", action:"forge_adj" },
       desc:"隣接するユニットのATK+1" }),
-  card(18, "柵",         1, 3, 0, "1.1", "facility", "none"),
-  card(19, "やぐら",   4, 3, 2, "d3", "facility", "none"),
+  card(0018, "柵",         1, 3, 0, "1.1", "facility", "none"),
+  card(0019, "やぐら",   4, 3, 2, "d3", "facility", "none"),
 
   // ── スペル ──
   card(20, "幸運",   0, 0, 0, "1.1", "spell", "none",
-    { effect:{ trigger:"activate", target:"self", action:"gain_cost", amount:1 },
-      desc:"1コスト獲得" }),
+    { effect:{ trigger:"activate", target:"self", action:"gain_cost", amount:2 },
+      desc:"2コスト獲得" }),
   card(21, "落雷",   2, 0, 0, "1.1", "spell", "none",
     { effect:{ trigger:"activate", target:"select_enemy", action:"damage", amount:3 },
       targetType:"enemy", desc:"敵1体に3ダメージ" }),
@@ -124,6 +130,14 @@ export const INITIAL_CARDS = [
       targetType:"ally", desc:"味方1体ATK+3（このターン）" }),
 
   // ── 機械属 ──
+  card(1201, "ルンバ", 1, 1, 0, "1.1", "unit", "machine",
+  { tags:["オーバークロック"], desc:"発動で追加行動。ターン終了時に破壊" }),
+card(1202, "銃撃ドローン", 3, 1, 1, "d2", "unit", "machine",
+  { tags:["オーバークロック"], desc:"発動で追加行動。ターン終了時に破壊" }),
+card(1210, "工場", 9, 8, 0, "1.1", "facility", "none",
+  { effect:{ trigger:"passive", action:"cost_minus_attr", filter:{ attr:"machine" }, amount:1 },
+    desc:"場にいる間機械属性の召喚コスト-1" }),
+  
   card(29, "機械龍",     105, 6, 3, "1.2", "unit", "machine",
     { effect:{ trigger:"link_machine", target:"self", action:"atk_up", amount:1 },
       desc:"機械属リンク時ATK+1" }),
@@ -133,6 +147,11 @@ export const INITIAL_CARDS = [
   card(31, "タレット",   103, 3, 1, "1.1", "facility", "machine",
     { effect:{ trigger:"link_machine", target:"enemy_front_col", action:"damage", amount:1 },
       desc:"機械属リンク時前列に1ダメージ" }),
+    card(63, "冷却器", 2, 0, 0, "1.1", "magic", "machine",
+  { effect:{ trigger:"activate", target:"select_ally", action:"unrotate" },
+    targetType:"ally_machine", desc:"機械属1体を行動可能にする" }),
+card(64, "暴走機関", 4, 5, 5, "1.2", "unit", "machine",
+  { tags:["オーバークロック"], desc:"発動で追加行動。ターン終了時に破壊" }),
 
   // ── 龍属性 ──
   card(32, "骨龍", 105, 4, 3, "1.1", "unit", "dragon",
@@ -186,12 +205,6 @@ card(1006,  "スペードの6",        101, 1,  2, "1.1", "unit",     "none"),
 card(1007,  "スペードの7",        101, 1,  2, "1.1", "unit",     "none"),
 card(1008,  "スペードの8",        8, 5,  4, "1.1", "unit",     "none",{ tags:["先制"] }),
 card(1011,  "スペードのJ",        9, 1,  11, "1.1", "unit",     "trump"),
-//日本
-card(1101,  "侍",        2, 2,  2, "1.1", "unit",     "none",{ tags:["先制"] }),
-card(1102,  "小次郎",        6, 5,  2, "3.1", "unit",     "none",{ tags:["2回行動"] }),
-card(1103,  "忍者",        4, 2,  3, "3.1", "unit",     "none",{ tags:["先制","速攻"] }),
-card(1104,  "火縄銃",        3, 3,  4, "1.3", "unit",     "none",{ tags:["速攻","反動"] }),
-card(1109,  "狐",        9, 7,  2, "３.3", "unit",     "none",{ tags:["先制","2回行動"] }),
 //ヨーロッパ
   // 同行にEU属性3体
 card(1201, "盾兵", 2, 5, 1, "1.1", "unit", "eu", {
@@ -294,9 +307,4 @@ card(1201, "盾兵", 2, 5, 1, "1.1", "unit", "eu", {
     { effect:{ trigger:"activate", action:"growth", filter:{ attr:"fish" }, maxCost:8 },
       tags:["成長8(魚)","先制"], desc:"手札の魚属性コスト8以下を召喚" }),
   card(3209, "クジラ", 98, 9, 3,"3.2", "unit", "fish"),
-  card(63, "冷却器", 2, 0, 0, "1.1", "magic", "machine",
-  { effect:{ trigger:"activate", target:"select_ally", action:"unrotate" },
-    targetType:"ally_machine", desc:"機械属1体を行動可能にする" }),
-card(64, "暴走機関", 4, 5, 5, "1.2", "unit", "machine",
-  { tags:["オーバークロック"], desc:"発動で追加行動。ターン終了時に破壊" }),
 ];
