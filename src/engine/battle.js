@@ -135,7 +135,7 @@ export function applyTurnStart(state, side, generatorType) {
   const log = [...state.log];
   const board = cloneBoard(state.board);
 
-  if (deck.length > 0 && hand.length < 10) hand.push(deck.shift());
+  if (deck.length > 0) hand.push(deck.shift());
 
   if (side === (state.firstPlayer || "blue")) {
     const round = Math.ceil(state.turn / 2);
