@@ -1,3 +1,4 @@
+import { TYPES, MAX_TURNS, getGeneratorCost } from '../constants/index.js';
 import { makeUnitFromCard, shuffle, resolveTargets, applyAction,
          calcForgeBonus, calcPassiveCostReduction, getEffectiveCost,
          unitToCard } from './effects.js';
@@ -9,6 +10,7 @@ export function cloneBoard(board) {
     red:  board.red.map(col  => col.map(u => ({ ...u }))),
   };
 }
+
 
 // ===== 射程 =====
 const isTank = u => u && (u.type === TYPES.TANK || u.tags?.includes("タンク"));
