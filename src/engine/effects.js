@@ -167,7 +167,18 @@ export function applyAction(effect, targets, ctx, state) {
       say(`${drawn.length}枚ドロー`);
       break;
     }
-
+    case "draw_all": {
+      // 山札を全て引く（both: true なら両プレイヤー）。手札上限なし
+      const sides = effect.both ? ["blue", "red"] : [side];
+      sides.forEach(sd => {
+        const dk = sd === "blue" ? "playerDeck" : "aiDeck";
+        const hk = sd === "blue" ? "playerHand" : "aiHand";
+        s = { ...s, [dk]: [], [hk]: [...s[hk], ...s[dk]] };
+      });
+      say(effect.both ? "お互いのプレイヤーが山札を全て引いた" : "山札を全て引いた");
+      break;
+    }
+      
     case "recycle": {
       const gk = side === "blue" ? "playerGrave" : "aiGrave";
       const dk = side === "blue" ? "playerDeck" : "aiDeck";
