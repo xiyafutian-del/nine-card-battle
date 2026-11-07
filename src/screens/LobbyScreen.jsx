@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState } from 'react'; // Import を小文字に修正
 
 const DECK_SIZE = 15;
 
@@ -13,6 +13,8 @@ export function LobbyScreen({
 
   const busy = pvpStatus === "waiting" || pvpStatus === "playing";
   const deckInvalid = deckTotal !== DECK_SIZE;
+  // デッキ不正またはPVP待機中の場合にボタンを無効化
+  const canNotStart = busy || deckInvalid;
 
   return (
     <div className="min-h-screen bg-white text-black flex flex-col items-center px-4 py-8">
@@ -33,11 +35,11 @@ export function LobbyScreen({
         )}
 
         <div className="space-y-3">
-          <button onClick={() => onStart("pve")} disabled={busy}
+          <button onClick={() => onStart("pve")} disabled={canNotStart}
             className="w-full bg-white hover:bg-gray-100 font-bold py-3 border border-black tracking-wide disabled:opacity-40">
             PVE対戦
           </button>
-          <button onClick={() => onStart("solo")} disabled={busy}
+          <button onClick={() => onStart("solo")} disabled={canNotStart}
             className="w-full bg-white hover:bg-gray-100 font-bold py-3 border border-black tracking-wide disabled:opacity-40">
             1人回し
           </button>
@@ -54,8 +56,8 @@ export function LobbyScreen({
               <div className="border-t border-black p-3 space-y-3">
                 {pvpStatus === "idle" && (
                   <>
-                    <button onClick={onCreateRoom}
-                      className="w-full bg-white hover:bg-gray-100 font-bold py-2 border border-black text-sm">
+                    <button onClick={onCreateRoom} disabled={canNotStart}
+                      className="w-full bg-white hover:bg-gray-100 font-bold py-2 border border-black text-sm disabled:opacity-40">
                       部屋を作る（ホスト）
                     </button>
                     <div className="flex gap-2">
@@ -66,8 +68,8 @@ export function LobbyScreen({
                         onChange={e => setInputRoomId(e.target.value.toUpperCase())}
                         maxLength={6}
                       />
-                      <button onClick={() => onJoinRoom(inputRoomId)}
-                        className="bg-white hover:bg-gray-100 font-bold px-3 border border-black text-sm">
+                      <button onClick={() => onJoinRoom(inputRoomId)} disabled={canNotStart || !inputRoomId}
+                        className="bg-white hover:bg-gray-100 font-bold px-3 border border-black text-sm disabled:opacity-40">
                         入室
                       </button>
                     </div>
