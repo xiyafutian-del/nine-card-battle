@@ -65,7 +65,7 @@ export const CORE_CARD = {
 
 export const INITIAL_CARDS = [
   // ── 無属性ユニット ──
-  card(0001,  "ソルジャー",        2, 1,  2, "1.1", "unit",     "none"),
+  card(1,  "ソルジャー",        2, 1,  2, "1.1", "unit",     "none"),
   card(0002,  "シールドガード",     2, 3,  1, "1.1", "unit",     "none"),
   card(0003,  "アーチャー",         2, 1,  1, "d2", "unit",     "none"),
   card(0004,  "アサシン",           3, 1,  4, "1.1", "unit",     "none"),
