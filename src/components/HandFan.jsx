@@ -32,10 +32,12 @@ export function HandFan({
         const affordable = !inGrowthMode && handCost >= eff && !handDisabled && !isGameOver && phaseOk;
         const usable = inGrowthMode ? isGrowthTarget : affordable;
 
-        const offset = i - (n - 1) / 2;
-        const rotate = offset * 7;
-        const translateX = offset * 34;
-        const translateY = Math.abs(offset) * 6;
+               const offset = i - (n - 1) / 2;
+        const k = Math.min(1, 4 / Math.max(1, (n - 1) / 2));      // 枚数が多いほど扇を緩やかに
+        const spacing = Math.min(34, 280 / Math.max(1, n - 1));   // 枚数が多いほど重ねる
+        const rotate = offset * 7 * k;
+        const translateX = offset * spacing;
+        const translateY = Math.abs(offset) * 6 * k;
 
         return (
           <div
