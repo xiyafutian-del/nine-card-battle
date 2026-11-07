@@ -81,7 +81,7 @@ export default function App() {
   const {
     battle, confirmLeave,
     startBattle, requestBack, leaveToLobby, endTurn, nextPhase,
-    handleCellClick, handleSummon, handleGrowthSelect,handleAbility,
+    handleCellClick, handleSummon, handleGrowthSelect, handleAbility,
     setConfirmLeave, setBattle,
   } = useBattle(
     cardPool, deckCounts, playerGenerator, handleAction,
@@ -139,7 +139,6 @@ export default function App() {
     if (!deckOk()) return;
     const myDeck = withSkins(buildDeck(cardPool, deckCounts));
     const myHand = myDeck.splice(0, 4);
-    // ゲストの発電機もホストへ送る
     const state = await joinRoom(id, myDeck, myHand, playerGenerator);
     if (state) {
       const cs = coreSkin();
@@ -152,18 +151,16 @@ export default function App() {
     }
   }
 
-   // ロビーへ戻る: 対戦中は確認ダイアログを出すだけ（「戻る」で handleLeaveToLobby）
   function handleRequestBack() {
     if (battle && !battle.gameOver) { setConfirmLeave(true); return; }
     handleLeaveToLobby();
   }
   function handleLeaveToLobby() {
-    if (battle?.mode === "pvp") leaveRoom(!!battle.gameOver);   // 決着後なら部屋を削除
+    if (battle?.mode === "pvp") leaveRoom(!!battle.gameOver);
     leaveToLobby();
     setScreen("lobby");
   }
   
-    // PVP待機をやめる（部屋を閉じて、作りかけの盤面も破棄）
   function handleCancelRoom() {
     leaveRoom();
     leaveToLobby();
@@ -186,7 +183,6 @@ export default function App() {
   const isPvp = battle?.mode === "pvp";
   const myTurn = !isPvp || battle.active === myColor;
 
-  // 相手の切断により勝利して終了
   function claimWin() {
     setBattle(prev => prev
       ? { ...prev, gameOver: myColor, log: [...prev.log, "相手の切断により勝利"] }
@@ -194,7 +190,15 @@ export default function App() {
     setTimeout(handleAction, 100);
   }
 
-  if (screen === "battle" && battle) {
+  if (screen === "battle") {
+    if (!battle) {
+      return (
+        <div className="min-h-screen bg-white text-black flex items-center justify-center text-xs font-bold">
+          バトルをロード中…
+        </div>
+      );
+    }
+
     const showAbsent = isPvp && !battle.gameOver && absentSec >= ABSENT_NOTICE;
     return (
       <>
@@ -204,7 +208,7 @@ export default function App() {
           onLeaveToLobby={handleLeaveToLobby}
           onEndTurn={isPvp ? () => { if (myTurn) endTurn(); } : endTurn}
           onNextPhase={isPvp ? () => { if (myTurn) nextPhase(); } : nextPhase}
-                    onAbility={isPvp ? () => { if (myTurn) handleAbility(); } : handleAbility}
+          onAbility={isPvp ? () => { if (myTurn) handleAbility(); } : handleAbility}
           onCellClick={isPvp
             ? (row, col, extra) => { if (myTurn || row === -1) handleCellClick(row, col, extra); }
             : handleCellClick}
@@ -233,6 +237,7 @@ export default function App() {
       </>
     );
   }
+
   if (screen === "deck") {
     return (
       <DeckScreen
@@ -259,18 +264,10 @@ export default function App() {
       setPlayerGenerator={gen => handleActiveDeckChange({ ...activeDeck, generator: gen })}
       deckTotal={deckTotal}
       onStart={mode => {
-    if (!deckOk()) return;
-    
-    if (mode === "pve" || mode === "solo") {
-      startBattle(mode);
-    } else if (mode === "pvp") {
-      // PVPで「ゲーム開始」を押した場合（すでに部屋や盤面データができている想定）
-      // 必要に応じてここにPVP開始の追加処理があれば書く
-    }
-    
-    setScreen("battle");
-  }}
-
+        if (!deckOk()) return;
+        if (mode !== "pvp") startBattle(mode);
+        setScreen("battle");
+      }}
       onNav={setScreen}
       onCreateRoom={handleCreateRoom}
       onJoinRoom={handleJoinRoom}
@@ -279,4 +276,4 @@ export default function App() {
       onCancelRoom={handleCancelRoom}
     />
   );
-      }
+}
