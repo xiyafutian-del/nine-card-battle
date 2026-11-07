@@ -259,10 +259,18 @@ export default function App() {
       setPlayerGenerator={gen => handleActiveDeckChange({ ...activeDeck, generator: gen })}
       deckTotal={deckTotal}
       onStart={mode => {
-        if (!deckOk()) return;
-        if (mode !== "pvp") startBattle(mode);  // PVPは部屋作成/入室時に盤面が作られる
-        setScreen("battle");
-      }}
+    if (!deckOk()) return;
+    
+    if (mode === "pve" || mode === "solo") {
+      startBattle(mode);
+    } else if (mode === "pvp") {
+      // PVPで「ゲーム開始」を押した場合（すでに部屋や盤面データができている想定）
+      // 必要に応じてここにPVP開始の追加処理があれば書く
+    }
+    
+    setScreen("battle");
+  }}
+
       onNav={setScreen}
       onCreateRoom={handleCreateRoom}
       onJoinRoom={handleJoinRoom}
