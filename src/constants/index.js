@@ -26,8 +26,8 @@ export const TYPES = {
   export const MAX_TURNS = 25;
   
   export function getGeneratorCost(type, turn) {
-    if (type === "fire") return turn +1% 4 =< 2 ? 5 : 0;
-    if (type === "tinetu") return turn +1% 4 =< 2 ? 1 : 6;
+    if (type === "fire") return turn % 4 =< 2 ? 5 : 0;
+    if (type === "tinetu") return turn % 4 =< 2 ? 1 : 6;
     if (type === "wind") return Math.floor(Math.random() * 7);
     return 3;
   }
