@@ -1,4 +1,4 @@
-Import { TYPES, ATTRS } from './index.js';
+import { TYPES, ATTRS } from './index.js';
 
 // ============ 射程パース ============
 function parseRange(r) {
