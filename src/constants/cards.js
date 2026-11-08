@@ -223,14 +223,14 @@ card(1001,  "スペードのA",        1, 1,  1, "1.1", "unit",     "trump", {
     condition: { type: "cost_gte", value: 13 },
     effect:    { type: "atk_up",  value: 13 },
   },desc: "コスト10以上の時ATK+10"}),
-card(1002,  "スペードの2",        2, 1,  1, "1.1", "unit",     "trump", { tags:["2回行動",”反動”] }),
+card(1002,  "スペードの2",        2, 1,  1, "1.1", "unit",     "trump", { tags:["2回行動","反動"] }),
 card(1003,  "スペードの3",        3, 1,  1, "1.1", "unit",     "trump",
      { effect:{ trigger:"passive", action:"cost_minus_attr", filter:{ attr:"trump" }, amount:1},
       desc:"トランプ属性の召喚コスト-1" }),
 card(1004,  "スペードの4",        4, 2,  2, "1.4", "unit",     "trump"),
 card(1005,  "スペードの5",        5, 3,  2, "5.1", "unit",     "trump"),
 card(1006,  "スペードの6",        6, 7,  2, "1.1", "unit",     "none", { tags:["タンク"]}),
-card(1007,  "スペードの7",        7, 1,  1, "1.1",”unit”, ["trump",”7”],{
+card(1007,  "スペードの7",        7, 1,  1, "1.1","unit", ["trump","7"],{
 conditional: {
     condition: { type: "row_attr", value: "7", count: 3 },
     effect:    { type: "atk_up",  value: 7 },},
