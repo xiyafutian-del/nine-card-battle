@@ -16,9 +16,9 @@ export const TYPES = {
   export const GENERATORS = { WATER:"water", FIRE:"fire", WIND:"wind" };
   
   export const GENERATOR_INFO = {
-    water: { name:"水力発電", desc:"3,3,3..." },
-    fire:  { name:"火力発電", desc:"6,1,1,6,1,1..." },
-    tinetu:  { name:"地熱発電", desc:"2,2,6,2,2,6..." },
+    water: { name:"水力発電", desc:"3,3,3,3..." },
+    fire:  { name:"火力発電", desc:"5,5,0,0..." },
+    tinetu:  { name:"地熱発電", desc:"1,1,6,6..." },
     wind:  { name:"風力発電", desc:"毎ターン0〜6ランダム" },
   };
   
@@ -26,8 +26,8 @@ export const TYPES = {
   export const MAX_TURNS = 25;
   
   export function getGeneratorCost(type, turn) {
-    if (type === "fire") return turn % 3 === 1 ? 6 : 1;
-    if (type === "tinetu") return turn % 3 === 0 ? 6 : 2;
+    if (type === "fire") return turn +1% 4 =< 2 ? 5 : 0;
+    if (type === "tinetu") return turn +1% 4 =< 2 ? 1 : 6;
     if (type === "wind") return Math.floor(Math.random() * 7);
     return 3;
   }
