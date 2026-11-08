@@ -1,33 +1,34 @@
 export const TYPES = {
-    UNIT: "unit", TANK: "tank", FACILITY: "facility",
-    SPELL: "spell", MAGIC: "magic",
-  };
-  
-  export const ATTRS = {
-    NONE: "none", MACHINE: "machine", DRAGON: "dragon",
-    WALL: "wall", EARTH: "earth", GRASS: "grass", BUG: "bug",
-  };
-  
-  export const ATTR_LABELS = {
-    none:"", machine:"機", dragon:"龍", wall:"壁",
-    earth:"土", grass:"草", bug:"虫",
-  };
-  
-  export const GENERATORS = { WATER:"water", FIRE:"fire", WIND:"wind" };
-  
-  export const GENERATOR_INFO = {
-    water: { name:"水力発電", desc:"3,3,3,3..." },
-    fire:  { name:"火力発電", desc:"5,5,0,0..." },
-    tinetu:  { name:"地熱発電", desc:"1,1,6,6..." },
-    wind:  { name:"風力発電", desc:"毎ターン0〜6ランダム" },
-  };
-  
-  export const RANGE_TYPE = { RECT:"rect", DIAMOND:"diamond" };
-  export const MAX_TURNS = 25;
-  
-  export function getGeneratorCost(type, turn) {
-    if (type === "fire") return turn % 4 === 2 ? 5 : 0;
-    if (type === "tinetu") return turn % 4 === 2 ? 1 : 6;
-    if (type === "wind") return Math.floor(Math.random() * 7);
-    return 3;
-  }
+  UNIT: "unit", TANK: "tank", FACILITY: "facility",
+  SPELL: "spell", MAGIC: "magic",
+};
+
+export const ATTRS = {
+  NONE: "none", MACHINE: "machine", DRAGON: "dragon",
+  WALL: "wall", EARTH: "earth", GRASS: "grass", BUG: "bug",
+};
+
+export const ATTR_LABELS = {
+  none:"", machine:"機", dragon:"龍", wall:"壁",
+  earth:"土", grass:"草", bug:"虫",
+};
+
+export const GENERATORS = { WATER: "water", FIRE: "fire", TINETU: "tinetu", WIND: "wind" };
+
+export const GENERATOR_INFO = {
+  water: { name: "水力発電", desc: "3,3,3,3..." },
+  fire:  { name: "火力発電", desc: "5,5,0,0..." },
+  tinetu: { name: "地熱発電", desc: "1,1,6,6..." },
+  wind:  { name: "風力発電", desc: "毎ターン0〜6ランダム" },
+};
+
+export const RANGE_TYPE = { RECT: "rect", DIAMOND: "diamond" };
+export const MAX_TURNS = 25;
+
+export function getGeneratorCost(type, turn) {
+  const mod = (turn - 1) % 4;
+  if (type === "fire") return mod < 2 ? 5 : 0;
+  if (type === "tinetu") return mod < 2 ? 1 : 6;
+  if (type === "wind") return Math.floor(Math.random() * 7);
+  return 3;
+}
