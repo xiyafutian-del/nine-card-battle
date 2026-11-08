@@ -99,25 +99,25 @@ card(201, "魔法少女ルビー", 3, 3, 1, "1.1", "unit", "crystal", {
   conditional: {
     condition: { type: "cost_gte", value: 6 },
     effect:    { type: "atk_up",  value: 2 }, },
-  desc: "コスト6以上の時ATK+2"})
+  desc: "コスト6以上の時ATK+2"}),
 
 card(202, "魔法少女サファイア", 4, 1, 2, "3.1", "unit", "crystal", {
   conditional: {
     condition: { type: "cost_gte", value: 4 },
     effect:    { type: "vrange_up",  value: 1 },  },
-  desc: "コスト4以上の時縦射程+1"})
+  desc: "コスト4以上の時縦射程+1"}),
 
 card(203, "魔法少女エメラルド", 6, 6, 2, "d3", "unit", "crystal", {
   conditional: {
     condition: { type: "cost_gte", value: 6 },
     effect:    { type: "add_tag",  value: "2回行動" },},
-  desc: "コスト6以上の時2回行動"})
+  desc: "コスト6以上の時2回行動"}),
 
 card(204, "魔法少女ダイヤモンド", 5, 4, 4, "1.1", "unit", "crystal", {
   conditional: {
     condition: { type: "cost_gte", value: 8 },
     effect:    { type: "add_tag",  value: "タンク" },  },
-  desc: "コスト8以上の時タンク"})
+  desc: "コスト8以上の時タンク"}),
 
 
   // ── スペル ──
