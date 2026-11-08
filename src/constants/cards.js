@@ -229,9 +229,9 @@ card(1003,  "スペードの3",        3, 1,  1, "1.1", "unit",     "trump",
 card(1004,  "スペードの4",        4, 2,  2, "1.4", "unit",     "trump"),
 card(1005,  "スペードの5",        5, 3,  2, "5.1", "unit",     "trump"),
 card(1006,  "スペードの6",        6, 7,  2, "1.1", "unit",     "none", { tags:["タンク"]}),
-card(1007,  "スペードの7",        7, 1,  1, "1.1",”unit”, ["trump",”7”]),
+card(1007,  "スペードの7",        7, 1,  1, "1.1",”unit”, ["trump",”7”],{
 conditional: {
-    condition: { type: "row_attr", value: "eu", count: 3 },
+    condition: { type: "row_attr", value: "7", count: 3 },
     effect:    { type: "atk_up",  value: 7 },},
   desc: "同行に7が3体で攻撃+7"}),
 card(1008,  "スペードの8",        8, 5,  3, "1.1", "unit",     "trump",{ tags:["先制"] }),
