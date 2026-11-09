@@ -39,19 +39,38 @@ export function CardLayout({
   const bs = `${bw}px solid black`;
   const r  = `${3 * scale}px`;
 
+  // 黒枠は子要素を覆う別レイヤーとして描く（フレームスキンと同じ外形にぴったり重ねるため）
+  const borderLayer = (
+    <div style={{
+      position: "absolute", left: 0, top: 0, right: 0, bottom: 0,
+      boxSizing: "border-box", border: bs, borderRadius: r,
+      pointerEvents: "none", zIndex: 9,
+    }}/>
+  );
+  const rootStyle = {
+    width: `${w}px`, height: `${h}px`, borderRadius: r,
+    opacity: dimmed ? 0.45 : 1,
+    transform: `rotate(${rotateDeg}deg)`, transformOrigin: "center center",
+    ...noSelect,
+  };
+  // 帯の太さ = 黒枠 + 内側に1.5pt（カードの大きさに比例）
+  const band = bw + 1.5 * scale;
+
   if (isCore) {
     return (
-      <div {...pp} className="relative flex flex-col bg-white overflow-hidden"
-        style={{ width:`${w}px`, height:`${h}px`, border:bs, borderRadius:r,
-          transform:`rotate(${rotateDeg}deg)`, transformOrigin:"center center", ...noSelect }}>
-        <div className="flex items-center justify-center flex-shrink-0"
-          style={{ height:"30%", borderBottom:bs }}>
-          <span className="font-bold" style={{ fontSize:`${7*scale}px` }}>コア</span>
+      <div {...pp} className="relative" style={rootStyle}>
+        <div className="flex flex-col bg-white overflow-hidden"
+          style={{ width: "100%", height: "100%", borderRadius: r }}>
+          <div className="flex items-center justify-center flex-shrink-0"
+            style={{ height: "30%", borderBottom: bs }}>
+            <span className="font-bold" style={{ fontSize: `${7*scale}px` }}>コア</span>
+          </div>
+          <div className="flex-1 flex items-center justify-center">
+            <span className="font-bold" style={{ fontSize: `${18*scale}px` }}>{card.hp}</span>
+          </div>
         </div>
-        <div className="flex-1 flex items-center justify-center">
-          <span className="font-bold" style={{ fontSize:`${18*scale}px` }}>{card.hp}</span>
-        </div>
-        {skin && <SkinFrame skin={skin} w={w} h={h}/>}
+        {borderLayer}
+        {skin && <SkinFrame skin={skin} w={w} h={h} band={band} radius={3 * scale}/>}
       </div>
     );
   }
@@ -64,14 +83,9 @@ export function CardLayout({
   const tagsH  = hasTags ? Math.round(h * 0.10) : 0;
 
   return (
-    <div {...pp} className="relative flex flex-col bg-white overflow-hidden"
-      style={{
-        width:`${w}px`, height:`${h}px`, border:bs, borderRadius:r,
-        opacity: dimmed ? 0.45 : 1,
-        transform:`rotate(${rotateDeg}deg)`,
-        transformOrigin:"center center",
-        ...noSelect,
-      }}>
+    <div {...pp} className="relative" style={rootStyle}>
+      <div className="flex flex-col bg-white overflow-hidden"
+        style={{ width: "100%", height: "100%", borderRadius: r }}>
 
       {/* コスト + 名前 */}
       <div className="flex items-stretch flex-shrink-0" style={{ height:`${nameH}px` }}>
@@ -127,10 +141,13 @@ export function CardLayout({
         </span>
       </div>
 
-      {extraBottom}
+        {extraBottom}
+      </div>
+
+      {borderLayer}
 
       {/* フレームスキン */}
-      {skin && <SkinFrame skin={skin} w={w} h={h}/>}
+      {skin && <SkinFrame skin={skin} w={w} h={h} band={band} radius={3 * scale}/>}
     </div>
   );
 }
@@ -199,4 +216,4 @@ export function CardGrid({ card, image, count, onInc, onDec, skin=null }) {
       )}
     </div>
   );
-}
+        }
