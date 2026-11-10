@@ -127,8 +127,6 @@ export function checkVictory(board, turn) {
 }
 
 // ===== ターン開始 =====
-// 発電機: 先攻のターンが始まる時（= ラウンドの始まり）に、両プレイヤーが
-// 自分の発電機の分のコストを得る。ラウンド = 先攻・後攻が1回ずつ動く単位
 export function applyTurnStart(state, side, generatorType) {
   const hand = side === "blue" ? [...state.playerHand] : [...state.aiHand];
   const deck = side === "blue" ? [...state.playerDeck] : [...state.aiDeck];
@@ -139,14 +137,13 @@ export function applyTurnStart(state, side, generatorType) {
 
   if (deck.length > 0) hand.push(deck.shift());
 
-  if (side === (state.firstPlayer || "blue")) {
-    const round = Math.ceil(state.turn / 2);
-    const gBlue = getGeneratorCost(state.playerGenerator || "water", round);
-    const gRed  = getGeneratorCost(state.aiGenerator || "water", round);
-    cost      += side === "blue" ? gBlue : gRed;
-    otherCost += side === "blue" ? gRed : gBlue;
-    log.push(`ラウンド${round}: 🔵+${gBlue} / 🔴+${gRed}`);
-  }
+  // 発電機: ターンが始まるたびに（自分のターンも相手のターンも）、
+  // 両プレイヤーが自分の発電機の分のコストを得る
+  const gBlue = getGeneratorCost(state.playerGenerator || "water", state.turn);
+  const gRed  = getGeneratorCost(state.aiGenerator || "water", state.turn);
+  cost      += side === "blue" ? gBlue : gRed;
+  otherCost += side === "blue" ? gRed : gBlue;
+  log.push(`ターン${state.turn}: 🔵+${gBlue} / 🔴+${gRed}`);
 
   // 回転を時計回り90度戻す（0度は超えない）・行動状態リセット
   board[side].forEach(col => col.forEach(u => {
