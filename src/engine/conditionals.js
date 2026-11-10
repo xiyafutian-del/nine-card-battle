@@ -79,9 +79,15 @@ export function applyConditionals(state, side) {
 
       const list = Array.isArray(unit.conditional) ? unit.conditional
         : unit.conditional ? [unit.conditional] : [];
-      list.forEach(({ condition, effect }) => {
-        if (checkCondition(condition, { unit, ci, ri, board: state.board, side: s, cost, hand }))
+      
+      list.forEach(item => {
+        // ★ここでネスト形式 ({ condition, effect }) と フラット形式 ({ type, value, effect }) の両方に対応させる
+        const condition = item.condition || item;
+        const effect = item.effect;
+
+        if (condition && effect && checkCondition(condition, { unit, ci, ri, board: state.board, side: s, cost, hand })) {
           applyCondEffect(effect, unit);
+        }
       });
     }));
   });
