@@ -36,19 +36,27 @@ function imageFor(id, name) {
 }
 
 function card(id, name, cost, hp, atk, range, type, attr, extra = {}) {
+  const parsedRange = parseRange(range);
+  const tags = extra.tags || [];
   return {
-    id, name, cost, hp, atk,
-    ...parseRange(range),
+    id, name, cost, 
+    hp, maxHp: hp, baseHp: hp,
+    atk, baseAtk: atk,
+    ...parsedRange,
+    baseHRange: parsedRange.hRange,
+    baseVRange: parsedRange.vRange,
     type: TYPES[type.toUpperCase()] || type,
     attr: ATTRS[attr.toUpperCase()] || attr,
     effect: extra.effect || null,
     conditional: extra.conditional || null,
     targetType: extra.targetType || "none",
-    tags: extra.tags || [],
+    tags: tags,
+    baseTags: [...tags],
     desc: extra.desc || "",
     image: extra.image || imageFor(id, name),
   };
 }
+
 
 export const CORE_CARD = {
   id: "core", name: "コア", cost: 0, hp: 10, atk: 1,
